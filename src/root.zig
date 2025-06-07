@@ -136,6 +136,13 @@ pub const Vec4b = Vector(4, bool, .auto);
 
 pub const Matrix = @import("mat.zig").Matrix;
 
+pub const Mat2f = Matrix(2, 2, f32, .auto);
+pub const Mat2d = Matrix(2, 2, f64, .auto);
+pub const Mat3f = Matrix(3, 3, f32, .auto);
+pub const Mat3d = Matrix(3, 3, f64, .auto);
+pub const Mat4f = Matrix(4, 4, f32, .auto);
+pub const Mat4d = Matrix(4, 4, f64, .auto);
+
 // =================================================================================================
 // Constants
 // =================================================================================================
@@ -316,12 +323,18 @@ pub inline fn isSigned(comptime T: type) bool {
 
 /// Returns whether the given type is a vector type created with the `Vector` generic function.
 pub inline fn isVector(comptime T: type) bool {
-    return @hasDecl(T, "__zm_private_is_vector");
+    return switch (@typeInfo(T)) {
+        .@"struct", .@"union", .@"enum", .@"opaque" => @hasDecl(T, "__zm_private_is_vector"),
+        else => false,
+    };
 }
 
 /// Returns whether the given type is a matrix type created with the `Matrix` generic function.
 pub inline fn isMatrix(comptime T: type) bool {
-    return @hasDecl(T, "__zm_private_is_matrix");
+    return switch (@typeInfo(T)) {
+        .@"struct", .@"union", .@"enum", .@"opaque" => @hasDecl(T, "__zm_private_is_matrix"),
+        else => false,
+    };
 }
 
 // =================================================================================================
@@ -376,35 +389,8 @@ pub fn cast(comptime T: type, val: anytype) T {
 // =================================================================================================
 
 test {
-    // =============================================================================================
-    // Sub-modules
-    // =============================================================================================
-
     _ = @import("vec.zig");
     _ = @import("mat.zig");
-
-    // =============================================================================================
-    // Vector & Matrices
-    // =============================================================================================
-
-    const tested_elements: []const type = &.{
-        f16, f32, f64,
-        i32, u32, bool,
-    };
-    const tested_dims: []const usize = &.{ 0, 1, 2, 3, 4, 8 };
-    const tested_reprs: []const ReprConfig = &.{
-        ReprConfig.auto,
-        ReprConfig.optimize,
-        ReprConfig.transparent,
-    };
-
-    inline for (tested_elements) |T| {
-        inline for (tested_reprs) |repr| {
-            inline for (tested_dims) |dim| {
-                _ = Vector(dim, T, repr);
-            }
-        }
-    }
 }
 
 test isSimdCompatible {

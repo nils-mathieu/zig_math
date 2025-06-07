@@ -1493,46 +1493,6 @@ pub fn Vector(
             for (0..dim) |i| try std.testing.expectEqual(val, vector.get(i));
         }
 
-        test initX {
-            if (dim != 1) return;
-            const val_x = util.arbitrary(T, 10);
-            const vector = Vec.initX(val_x);
-            try std.testing.expectEqual(val_x, vector.get(0));
-        }
-
-        test initXY {
-            if (dim != 2) return;
-            const val_x = util.arbitrary(T, 10);
-            const val_y = util.arbitrary(T, 10);
-            const vector = Vec.initXY(val_x, val_y);
-            try std.testing.expectEqual(val_x, vector.get(0));
-            try std.testing.expectEqual(val_y, vector.get(1));
-        }
-
-        test initXYZ {
-            if (dim != 3) return;
-            const val_x = util.arbitrary(T, 10);
-            const val_y = util.arbitrary(T, 10);
-            const val_z = util.arbitrary(T, 10);
-            const vector = Vec.initXYZ(val_x, val_y, val_z);
-            try std.testing.expectEqual(val_x, vector.get(0));
-            try std.testing.expectEqual(val_y, vector.get(1));
-            try std.testing.expectEqual(val_z, vector.get(2));
-        }
-
-        test initXYZW {
-            if (dim != 4) return;
-            const val_x = util.arbitrary(T, 10);
-            const val_y = util.arbitrary(T, 10);
-            const val_z = util.arbitrary(T, 10);
-            const val_w = util.arbitrary(T, 10);
-            const vector = Vec.initXYZW(val_x, val_y, val_z, val_w);
-            try std.testing.expectEqual(val_x, vector.get(0));
-            try std.testing.expectEqual(val_y, vector.get(1));
-            try std.testing.expectEqual(val_z, vector.get(2));
-            try std.testing.expectEqual(val_w, vector.get(3));
-        }
-
         test unit_x {
             if (dim < 1) return;
             for (0..dim) |i| {
@@ -1996,10 +1956,68 @@ pub fn Vector(
 // Unit Tests
 // =================================================================================================
 
-const Vec2 = Vector(2, i32, .auto);
-const Vec4 = Vector(4, i32, .auto);
+/// Includes tests for vectors of fixed dimensions.
+fn includeFixedTests(comptime T: type, comptime repr: ReprConfig) void {
+    const Vec1 = Vector(1, T, repr);
+    const Vec2 = Vector(2, T, repr);
+    const Vec3 = Vector(3, T, repr);
+    const Vec4 = Vector(4, T, repr);
 
-test "pre-defined swizzles" {
+    _ = struct {
+        test "initX" {
+            const val_x = util.arbitrary(T, 10);
+            const vector = Vec1.initX(val_x);
+            try std.testing.expectEqual(val_x, vector.get(0));
+        }
+
+        test "initXY" {
+            const val_x = util.arbitrary(T, 10);
+            const val_y = util.arbitrary(T, 10);
+            const vector = Vec2.initXY(val_x, val_y);
+            try std.testing.expectEqual(val_x, vector.get(0));
+            try std.testing.expectEqual(val_y, vector.get(1));
+        }
+
+        test "initXYZ" {
+            const val_x = util.arbitrary(T, 10);
+            const val_y = util.arbitrary(T, 10);
+            const val_z = util.arbitrary(T, 10);
+            const vector = Vec3.initXYZ(val_x, val_y, val_z);
+            try std.testing.expectEqual(val_x, vector.get(0));
+            try std.testing.expectEqual(val_y, vector.get(1));
+            try std.testing.expectEqual(val_z, vector.get(2));
+        }
+
+        test "initXYZW" {
+            const val_x = util.arbitrary(T, 10);
+            const val_y = util.arbitrary(T, 10);
+            const val_z = util.arbitrary(T, 10);
+            const val_w = util.arbitrary(T, 10);
+            const vector = Vec4.initXYZW(val_x, val_y, val_z, val_w);
+            try std.testing.expectEqual(val_x, vector.get(0));
+            try std.testing.expectEqual(val_y, vector.get(1));
+            try std.testing.expectEqual(val_z, vector.get(2));
+            try std.testing.expectEqual(val_w, vector.get(3));
+        }
+    };
+}
+
+test {
+    inline for (util.tested_elements) |T| {
+        inline for (util.tested_reprs) |repr| {
+            inline for (util.tested_dims) |dim| {
+                _ = Vector(dim, T, repr);
+            }
+
+            includeFixedTests(T, repr);
+        }
+    }
+}
+
+test "some swizzles" {
+    const Vec2 = Vector(2, i32, .auto);
+    const Vec4 = Vector(4, i32, .auto);
+
     const v1 = Vec2.initXY(1, 2);
     const xyyx = v1.swizzles.xyyx();
 

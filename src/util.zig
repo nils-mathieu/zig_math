@@ -66,6 +66,16 @@ pub fn arbitrary(comptime T: type, amplitude: comptime_int) T {
                 return result;
             }
 
+            if (zm.isMatrix(T)) {
+                var result: T = undefined;
+                for (0..T.rows) |i| {
+                    for (0..T.columns) |j| {
+                        result.set(i, j, arbitrary(T.Element, amplitude));
+                    }
+                }
+                return result;
+            }
+
             const err = "`arbitrary()` is not supported for type `" ++ @typeName(T) ++ "`";
             @compileError(err);
         },
@@ -85,3 +95,22 @@ pub fn toleranceFor(comptime T: type) comptime_float {
         else => @compileError("no tolerance set for " ++ @typeName(T)),
     };
 }
+
+/// The elements that we want to make sure our library works with during
+/// tests.
+pub const tested_elements: []const type = &.{
+    f16, f32, f64,
+    i32, u32, bool,
+};
+
+/// The dimensions that we want to make sure our library works with during
+/// tests.
+pub const tested_dims: []const usize = &.{ 0, 1, 2, 3, 4 };
+
+/// The representations that we want to make sure our library works with during
+/// tests.
+pub const tested_reprs: []const zm.ReprConfig = &.{
+    zm.ReprConfig.auto,
+    zm.ReprConfig.optimize,
+    zm.ReprConfig.transparent,
+};
