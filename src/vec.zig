@@ -2,120 +2,8 @@ const std = @import("std");
 const zm = @import("root.zig");
 const util = @import("util.zig");
 
+const ReprConfig = zm.ReprConfig;
 const VectorSwizzles = @import("gen/vector_swizzles.zig").VectorSwizzles;
-
-/// Defines how the elements of a `Vector` must be laid out in memory.
-///
-/// # Fundamental Concepts
-///
-/// When working with vectors that contain multiple scalar values, there are several
-/// considerations for how to arrange the data in memory.
-///
-/// - **Alignment:** How the elements are positioned relative to memory boundaries.
-/// - **Size:** The total memory footprint of the structure.
-/// - **Padding:** Whether additional space is allocated between elements to align them.
-/// - **Order:** The sequence in which elements are stored.
-///
-/// # Performance Implications
-///
-/// Modern CPUs can perform optimizations on multiple data elements at once simultaneously using
-/// Single Instruction, Multiple Data (SIMD) instructions. However, SIMD instructions often
-/// have strict requirements about data alignment and layout. Choosing the wrong memory layout
-/// can lead to performance degradation and reduced efficiency. Therefore, it is crucial to
-/// carefully consider the memory layout of vectors to ensure optimal performance.
-///
-/// Choosing the wrong memory layout for your use case may result in:
-///
-/// - Using slower scalar operations instead of vectorized operations
-/// - Additional memory copies to satisfy memory alignment requirements
-/// - Cache inefficiencies due to poor memory locality
-/// - Misaligned casts when casting between naively aligned slices `[]T` and `[]Vector(dim, T)`
-///
-/// # TL;DR
-///
-/// Pre-defined constants are provided for the most common use cases:
-///
-/// - `.transparent`: Ensures that the memory layout of the vector matches that of a `[dim]T`
-///   array, including memory alignment, element order, and padding. This ensures that it is
-///   possible to cast to/from slices of `T`s. Use this when you need to use vectors through FFI
-///   boundaries.
-///
-/// - `.optimize`: Ensures that the most efficient memory layout is used, potentially using higher
-///   alignment and padding to improve cache performance and in-place SIMD operations.
-pub const VectorRepr = struct {
-    /// Preserve the natural memory alignment of the element type.
-    ///
-    /// When enabled, the vector maintains the same alignment requirement as its
-    /// element type `T`, allowing safe casting between `[dim]T` arrays and
-    /// `Vector(dim, T)` without alignment issues. This is particularly important
-    /// when interfacing with external APIs, SIMD operations, or when working with
-    /// memory-mapped data that expects specific alignment.
-    ///
-    /// For example, if `T` is `f32` (4-byte aligned), the vector will also be 4-byte
-    /// aligned rather than potentially using a larger alignment for optimization.
-    /// This guarantees that operations like `@as([*]Vector(dim, T), @ptrCast(&elements))` are safe.
-    ///
-    /// When disabled, the implementation may choose a different alignment for
-    /// performance reasons, which could prevent direct casting to/from arrays.
-    preserve_alignment: bool,
-
-    /// Prevent adding padding bytes to the vector's memory layout.
-    ///
-    /// When enabled, guarantees that `Vector(dim, T)` has exactly the same size
-    /// as `[dim]T`, ensuring `@sizeOf(Vector(3, f32)) == @sizeOf([3]f32)`.
-    /// This is crucial for binary compatibility, serialization, and when the
-    /// exact memory footprint matters.
-    ///
-    /// When disabled, the implementation may add padding bytes for performance
-    /// optimizations such as:
-    /// - Aligning to cache line boundaries
-    /// - Meeting SIMD instruction requirements (e.g., 16-byte alignment for SSE)
-    /// - Enabling more efficient memory access patterns
-    ///
-    /// Note that padding, if added, typically appears at the end of the vector's
-    /// memory block and doesn't affect element ordering or accessibility.
-    preserve_size: bool,
-
-    /// A vector representation configuration that ensures the vector's memory layout is optimized
-    /// whenever it does not affect the vector's size.
-    ///
-    /// # Practical Considerations
-    ///
-    /// This is a usually good compromise between performance and memory efficiency. Vectors of
-    /// size 1, 2, and 4 are already aligned correctly for SIMD operations to perform
-    /// as efficiently as possible.
-    ///
-    /// For vectors of size 3, an array is used to ensure no padding is added. If you want
-    /// vectors of size 3 to be optimized, you can use the `optimize` configuration instead, at
-    /// the cost of a padding element added to the end of the vector, giving it the same size
-    /// as a vector of size 4.
-    pub const auto: VectorRepr = .{
-        .preserve_size = true,
-        .preserve_alignment = false,
-    };
-
-    /// A vector representation configuration that ensures the vector's memory layout is optimized
-    /// for performance.
-    pub const optimize: VectorRepr = .{
-        .preserve_size = false,
-        .preserve_alignment = false,
-    };
-
-    /// A vector representation configuration that ensures the vector is completely
-    /// transparent to an array.
-    ///
-    /// This allows for seamless casting to and from slices of elements without running
-    /// into alignment issues.
-    pub const transparent: VectorRepr = .{
-        .preserve_size = true,
-        .preserve_alignment = true,
-    };
-};
-
-/// Returns whether the given type is a vector type created with the `Vector` generic function.
-pub inline fn isVector(comptime T: type) bool {
-    return @hasDecl(T, "__zm_private_is_vector");
-}
 
 /// Creates a vector type with the specified element type and dimension.
 ///
@@ -127,7 +15,7 @@ pub inline fn isVector(comptime T: type) bool {
 /// - `T`: The element type of the vector. This will usually be `f32` or `f64`.
 ///
 /// - `repr`: The representation configuration of the vector. This controls how the vector
-///   can lay out its elements in memory. See `VectorRepr` for more details.
+///   can lay out its elements in memory. See `ReprConfig` for more details.
 ///
 /// # Returns
 ///
@@ -135,7 +23,7 @@ pub inline fn isVector(comptime T: type) bool {
 pub fn Vector(
     comptime dim: usize,
     comptime T: type,
-    comptime repr: VectorRepr,
+    comptime repr: ReprConfig,
 ) type {
     return extern struct {
         const Vec = @This();
@@ -173,7 +61,7 @@ pub fn Vector(
             if (dim == 0) break :blk [0]T;
 
             // If `T` cannot be used with SIMD, use a regular array.
-            if (!zm.scalar.isSimdCompatible(T)) break :blk [dim]T;
+            if (!zm.isSimdCompatible(T)) break :blk [dim]T;
 
             const Simd = @Vector(dim, T);
             const Array = [dim]T;
@@ -209,13 +97,13 @@ pub fn Vector(
         // =========================================================================================
 
         /// A vector with all elements set to zero.
-        pub const zero = splat(zm.scalar.zeroValue(T));
+        pub const zero = splat(zm.zeroValue(T));
 
         /// A vector with all elements set to one.
-        pub const one = splat(zm.scalar.oneValue(T));
+        pub const one = splat(zm.oneValue(T));
 
         /// A vector with all elements set to negative one.
-        pub const neg_one = splat(-zm.scalar.oneValue(T));
+        pub const neg_one = splat(-zm.oneValue(T));
 
         /// A vector with all elements set to the maximum value of the type.
         ///
@@ -226,7 +114,7 @@ pub fn Vector(
         /// * For **floating-point numbers**, this corresponds to the positive infinity.
         ///
         /// * For **booleans**, this corresponds to `true`.
-        pub const max_value = splat(zm.scalar.maxValue(T));
+        pub const max_value = splat(zm.maxValue(T));
 
         /// A vector with all elements set to the minimum value of the type.
         ///
@@ -237,7 +125,7 @@ pub fn Vector(
         /// * For **floating-point numbers**, this corresponds to the negative infinity.
         ///
         /// * For **booleans**, this corresponds to `false`.
-        pub const min_value = splat(zm.scalar.minValue(T));
+        pub const min_value = splat(zm.minValue(T));
 
         /// A vector with all elements set to zero, except for the X element set to one.
         pub const unit_x = unit(0);
@@ -284,7 +172,7 @@ pub fn Vector(
         /// index, which is set to one.
         pub inline fn unit(index: usize) Vec {
             var result = zero;
-            result.set(index, zm.scalar.oneValue(T));
+            result.set(index, zm.oneValue(T));
             return result;
         }
 
@@ -496,7 +384,7 @@ pub fn Vector(
         ) Vec {
             const Rhs = @TypeOf(other);
 
-            if (zm.scalar.isSimdCompatible(T) and @hasDecl(Context, "invokeOnVector")) {
+            if (zm.isSimdCompatible(T) and @hasDecl(Context, "invokeOnVector")) {
                 // The type `T` can be used with SIMD vectors. Whether we're using a SIMD layout
                 // for the current vector or not does not matter, we can move the values to a
                 // SIMD vector if they are not already in one.
@@ -558,7 +446,7 @@ pub fn Vector(
             comptime Ret: type,
             self: Vec,
         ) Ret {
-            if (zm.scalar.isSimdCompatible(T) and @hasDecl(Context, "invokeOnVector")) {
+            if (zm.isSimdCompatible(T) and @hasDecl(Context, "invokeOnVector")) {
                 // The type `T` can be used with SIMD vectors. Whether we're using a SIMD layout
                 // for the current vector or not does not matter, we can move the values to a
                 // SIMD vector if they are not already in one.
@@ -1114,13 +1002,13 @@ pub fn Vector(
 
         /// Computes the sum of all elements in the vector.
         pub inline fn elementSum(self: Vec) T {
-            if (dim == 0) return zm.scalar.zeroValue(T);
+            if (dim == 0) return zm.zeroValue(T);
 
-            if (zm.scalar.isSimdCompatible(T)) {
+            if (zm.isSimdCompatible(T)) {
                 const v: @Vector(dim, T) = self.inner;
                 return @reduce(.Add, v);
             } else {
-                var result: T = zm.scalar.zeroValue(T);
+                var result: T = zm.zeroValue(T);
                 for (0..dim) |i| result += self.get(i);
                 return result;
             }
@@ -1128,13 +1016,13 @@ pub fn Vector(
 
         /// Computes the product of all elements in the vector.
         pub inline fn elementProduct(self: Vec) T {
-            if (dim == 0) return zm.scalar.oneValue(T);
+            if (dim == 0) return zm.oneValue(T);
 
-            if (zm.scalar.isSimdCompatible(T)) {
+            if (zm.isSimdCompatible(T)) {
                 const v: @Vector(dim, T) = self.inner;
                 return @reduce(.Mul, v);
             } else {
-                var result: T = zm.scalar.oneValue(T);
+                var result: T = zm.oneValue(T);
                 for (0..dim) |i| result *= self.get(i);
                 return result;
             }
@@ -1144,7 +1032,7 @@ pub fn Vector(
         pub inline fn elementMax(self: Vec) T {
             assertDimensionIsAtLeast("elementMax()", 1);
 
-            if (zm.scalar.isSimdCompatible(T)) {
+            if (zm.isSimdCompatible(T)) {
                 const v: @Vector(dim, T) = self.inner;
                 return @reduce(.Max, v);
             } else {
@@ -1158,7 +1046,7 @@ pub fn Vector(
         pub inline fn elementMin(self: Vec) T {
             assertDimensionIsAtLeast("elementMin()", 1);
 
-            if (zm.scalar.isSimdCompatible(T)) {
+            if (zm.isSimdCompatible(T)) {
                 const v: @Vector(dim, T) = self.inner;
                 return @reduce(.Min, v);
             } else {
@@ -1186,13 +1074,13 @@ pub fn Vector(
         ///
         /// The squared Euclidean length of the vector.
         pub inline fn lengthSquared(self: Vec) T {
-            if (dim == 0) return zm.scalar.zeroValue(T);
+            if (dim == 0) return zm.zeroValue(T);
 
-            if (zm.scalar.isSimdCompatible(T)) {
+            if (zm.isSimdCompatible(T)) {
                 const v: @Vector(dim, T) = self.inner;
                 return @reduce(.Add, v * v);
             } else {
-                var sum: T = zm.scalar.zeroValue(T);
+                var sum: T = zm.zeroValue(T);
                 for (0..dim) |i| sum += self.get(i) * self.get(i);
                 return sum;
             }
@@ -1257,11 +1145,11 @@ pub fn Vector(
         ///
         /// If you're working with integers, then the tolerance value is not used.
         pub inline fn isNormalized(self: Vec, tolerance: T) bool {
-            if (zm.scalar.isInt(T)) {
+            if (zm.isInt(T)) {
                 return self.lengthSquared() == 1;
             }
 
-            if (zm.scalar.isFloat(T)) {
+            if (zm.isFloat(T)) {
                 // NOTE: We're multiplying the tolerance by 2.0 to account for the fact that
                 // we are working with squared lengths here.
                 return @abs(self.lengthSquared() - 1.0) <= tolerance * 2.0;
@@ -1286,7 +1174,7 @@ pub fn Vector(
         pub inline fn distanceSquared(self: Vec, other: Vec) T {
             // We handle unsigned integers specially because they have a defined absolute
             // difference even though the subtraction can underflow.
-            if (zm.scalar.isUnsignedInt(T)) {
+            if (zm.isUnsignedInt(T)) {
                 const v1 = self.min(other);
                 const v2 = self.max(other);
                 return v2.sub(v1).lengthSquared();
@@ -1510,14 +1398,14 @@ pub fn Vector(
 
         /// Returns whether all of the vector's components are finite.
         pub inline fn isFinite(self: Vec) bool {
-            if (!zm.scalar.isFloat(T)) return true;
+            if (!zm.isFloat(T)) return true;
             for (0..dim) |i| if (!std.math.isFinite(self.get(i))) return false;
             return true;
         }
 
         /// Returns whether any of the vector's components are `NaN`.
         pub inline fn isNan(self: Vec) bool {
-            if (!zm.scalar.isFloat(T)) return false;
+            if (!zm.isFloat(T)) return false;
             for (0..dim) |i| if (std.math.isNan(self.get(i))) return true;
             return false;
         }
@@ -1570,31 +1458,31 @@ pub fn Vector(
         }
 
         test zero {
-            const value = zm.scalar.zeroValue(T);
+            const value = zm.zeroValue(T);
             const vector = Vec.zero;
             for (0..dim) |i| try std.testing.expectEqual(value, vector.get(i));
         }
 
         test one {
-            const value = zm.scalar.oneValue(T);
+            const value = zm.oneValue(T);
             const vector = Vec.one;
             for (0..dim) |i| try std.testing.expectEqual(value, vector.get(i));
         }
 
         test max_value {
-            const value = zm.scalar.maxValue(T);
+            const value = zm.maxValue(T);
             const vector = Vec.max_value;
             for (0..dim) |i| try std.testing.expectEqual(value, vector.get(i));
         }
 
         test min_value {
-            const value = zm.scalar.minValue(T);
+            const value = zm.minValue(T);
             const vector = Vec.min_value;
             for (0..dim) |i| try std.testing.expectEqual(value, vector.get(i));
         }
 
         test nan {
-            if (!zm.scalar.isFloat(T)) return;
+            if (!zm.isFloat(T)) return;
             const vector = Vec.nan;
             for (0..dim) |i| try std.testing.expect(std.math.isNan(vector.get(i)));
         }
@@ -1649,9 +1537,9 @@ pub fn Vector(
             if (dim < 1) return;
             for (0..dim) |i| {
                 if (i == 0) {
-                    try std.testing.expectEqual(zm.scalar.oneValue(T), unit_x.get(i));
+                    try std.testing.expectEqual(zm.oneValue(T), unit_x.get(i));
                 } else {
-                    try std.testing.expectEqual(zm.scalar.zeroValue(T), unit_x.get(i));
+                    try std.testing.expectEqual(zm.zeroValue(T), unit_x.get(i));
                 }
             }
         }
@@ -1660,9 +1548,9 @@ pub fn Vector(
             if (dim < 2) return;
             for (0..dim) |i| {
                 if (i == 1) {
-                    try std.testing.expectEqual(zm.scalar.oneValue(T), unit_y.get(i));
+                    try std.testing.expectEqual(zm.oneValue(T), unit_y.get(i));
                 } else {
-                    try std.testing.expectEqual(zm.scalar.zeroValue(T), unit_y.get(i));
+                    try std.testing.expectEqual(zm.zeroValue(T), unit_y.get(i));
                 }
             }
         }
@@ -1671,9 +1559,9 @@ pub fn Vector(
             if (dim < 3) return;
             for (0..dim) |i| {
                 if (i == 2) {
-                    try std.testing.expectEqual(zm.scalar.oneValue(T), unit_z.get(i));
+                    try std.testing.expectEqual(zm.oneValue(T), unit_z.get(i));
                 } else {
-                    try std.testing.expectEqual(zm.scalar.zeroValue(T), unit_z.get(i));
+                    try std.testing.expectEqual(zm.zeroValue(T), unit_z.get(i));
                 }
             }
         }
@@ -1682,9 +1570,9 @@ pub fn Vector(
             if (dim < 4) return;
             for (0..dim) |i| {
                 if (i == 3) {
-                    try std.testing.expectEqual(zm.scalar.oneValue(T), unit_w.get(i));
+                    try std.testing.expectEqual(zm.oneValue(T), unit_w.get(i));
                 } else {
-                    try std.testing.expectEqual(zm.scalar.zeroValue(T), unit_w.get(i));
+                    try std.testing.expectEqual(zm.zeroValue(T), unit_w.get(i));
                 }
             }
         }
@@ -1715,7 +1603,7 @@ pub fn Vector(
         }
 
         test add {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const sum = v1.add(v2);
@@ -1723,7 +1611,7 @@ pub fn Vector(
         }
 
         test wrappingAdd {
-            if (!zm.scalar.isInt(T)) return;
+            if (!zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const sum = v1.wrappingAdd(v2);
@@ -1731,7 +1619,7 @@ pub fn Vector(
         }
 
         test saturatingAdd {
-            if (!zm.scalar.isInt(T)) return;
+            if (!zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const sum = v1.saturatingAdd(v2);
@@ -1739,10 +1627,10 @@ pub fn Vector(
         }
 
         test sub {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             var v1 = util.arbitrary(Vec, 10);
             var v2 = util.arbitrary(Vec, 10);
-            if (zm.scalar.isUnsignedInt(T)) {
+            if (zm.isUnsignedInt(T)) {
                 // Prevent underflow with unsigned ints.
                 const t1 = v1;
                 const t2 = v2;
@@ -1754,7 +1642,7 @@ pub fn Vector(
         }
 
         test wrappingSub {
-            if (!zm.scalar.isInt(T)) return;
+            if (!zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const diff = v1.wrappingSub(v2);
@@ -1762,7 +1650,7 @@ pub fn Vector(
         }
 
         test saturatingSub {
-            if (!zm.scalar.isInt(T)) return;
+            if (!zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const diff = v1.saturatingSub(v2);
@@ -1770,7 +1658,7 @@ pub fn Vector(
         }
 
         test mul {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             var v1 = util.arbitrary(Vec, 10);
             var v2 = util.arbitrary(Vec, 10);
             const prod = v1.mul(v2);
@@ -1778,7 +1666,7 @@ pub fn Vector(
         }
 
         test wrappingMul {
-            if (!zm.scalar.isInt(T)) return;
+            if (!zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const prod = v1.wrappingMul(v2);
@@ -1786,7 +1674,7 @@ pub fn Vector(
         }
 
         test saturatingMul {
-            if (!zm.scalar.isInt(T)) return;
+            if (!zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const prod = v1.saturatingMul(v2);
@@ -1794,18 +1682,18 @@ pub fn Vector(
         }
 
         test div {
-            if (!zm.scalar.isUnsignedInt(T) and !zm.scalar.isFloat(T)) return;
+            if (!zm.isUnsignedInt(T) and !zm.isFloat(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
-            for (0..dim) |i| if (v2.get(i) == zm.scalar.zeroValue(T)) return; // unlucky
+            for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
             const quot = v1.div(v2);
             for (0..dim) |i| try std.testing.expectEqual(v1.get(i) / v2.get(i), quot.get(i));
         }
 
         test divExact {
-            if (!zm.scalar.isInt(T)) return;
+            if (!zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
-            for (0..dim) |i| if (v1.get(i) == zm.scalar.zeroValue(T)) return; // unlucky
+            for (0..dim) |i| if (v1.get(i) == zm.zeroValue(T)) return; // unlucky
             const result = util.arbitrary(Vec, 10);
             const v2 = result.mul(v1);
             const quot = v2.divExact(v1);
@@ -1813,43 +1701,43 @@ pub fn Vector(
         }
 
         test divFloor {
-            if (!zm.scalar.isInt(T)) return;
+            if (!zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
-            for (0..dim) |i| if (v2.get(i) == zm.scalar.zeroValue(T)) return; // unlucky
+            for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
             const quot = v1.divFloor(v2);
             for (0..dim) |i| try std.testing.expectEqual(@divFloor(v1.get(i), v2.get(i)), quot.get(i));
         }
 
         test divTrunc {
-            if (!zm.scalar.isInt(T)) return;
+            if (!zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
-            for (0..dim) |i| if (v2.get(i) == zm.scalar.zeroValue(T)) return; // unlucky
+            for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
             const quot = v1.divTrunc(v2);
             for (0..dim) |i| try std.testing.expectEqual(@divTrunc(v1.get(i), v2.get(i)), quot.get(i));
         }
 
         test mod {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
-            for (0..dim) |i| if (v2.get(i) == zm.scalar.zeroValue(T)) return; // unlucky
+            for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
             const result = v1.mod(v2);
             for (0..dim) |i| try std.testing.expectEqual(@mod(v1.get(i), v2.get(i)), result.get(i));
         }
 
         test rem {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
-            for (0..dim) |i| if (v2.get(i) == zm.scalar.zeroValue(T)) return; // unlucky
+            for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
             const result = v1.rem(v2);
             for (0..dim) |i| try std.testing.expectEqual(@rem(v1.get(i), v2.get(i)), result.get(i));
         }
 
         test min {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const result = v1.min(v2);
@@ -1857,7 +1745,7 @@ pub fn Vector(
         }
 
         test max {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const result = v1.max(v2);
@@ -1865,27 +1753,27 @@ pub fn Vector(
         }
 
         test neg {
-            if (!zm.scalar.isSigned(T)) return;
+            if (!zm.isSigned(T)) return;
             const v = util.arbitrary(Vec, 10);
             const result = v.neg();
             for (0..dim) |i| try std.testing.expectEqual(-v.get(i), result.get(i));
         }
 
         test abs {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v = util.arbitrary(Vec, 10);
             const result = v.abs();
             for (0..dim) |i| try std.testing.expectEqual(@abs(v.get(i)), result.get(i));
         }
 
         test lengthSquared {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v = util.arbitrary(Vec, 10);
 
-            var expected = zm.scalar.zeroValue(T);
+            var expected = zm.zeroValue(T);
             for (0..dim) |i| expected += v.get(i) * v.get(i);
 
-            if (zm.scalar.isFloat(T)) {
+            if (zm.isFloat(T)) {
                 try std.testing.expectApproxEqRel(expected, v.lengthSquared(), util.toleranceFor(T));
             } else {
                 try std.testing.expectEqual(expected, v.lengthSquared());
@@ -1893,17 +1781,17 @@ pub fn Vector(
         }
 
         test length {
-            if (!zm.scalar.isFloat(T)) return;
+            if (!zm.isFloat(T)) return;
             const v = util.arbitrary(Vec, 10);
 
-            var expected = zm.scalar.zeroValue(T);
+            var expected = zm.zeroValue(T);
             for (0..dim) |i| expected += v.get(i) * v.get(i);
 
             try std.testing.expectApproxEqRel(@sqrt(expected), v.length(), util.toleranceFor(T));
         }
 
         test normalizeOrNull {
-            if (!zm.scalar.isFloat(T) or dim == 0) return;
+            if (!zm.isFloat(T) or dim == 0) return;
 
             const v1 = util.arbitrary(Vec, 10);
             const len = v1.length();
@@ -1918,7 +1806,7 @@ pub fn Vector(
         }
 
         test normalize {
-            if (!zm.scalar.isFloat(T) or dim == 0) return;
+            if (!zm.isFloat(T) or dim == 0) return;
 
             const v1 = util.arbitrary(Vec, 10);
             const len = v1.length();
@@ -1930,7 +1818,7 @@ pub fn Vector(
 
         test normalizeOrZero {
             // NOTE: `f16` just isn't precise enough for normalization to mean anything.
-            if (!zm.scalar.isFloat(T) or dim == 0) return;
+            if (!zm.isFloat(T) or dim == 0) return;
 
             const v1 = util.arbitrary(Vec, 10);
             const len = v1.length();
@@ -1945,9 +1833,9 @@ pub fn Vector(
         }
 
         test isNormalized {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
 
-            if (zm.scalar.isFloat(T)) {
+            if (zm.isFloat(T)) {
                 const v1 = util.arbitrary(Vec, 10);
                 if (std.math.isFinite(1.0 / v1.length())) {
                     try std.testing.expect(v1.normalize().isNormalized(util.toleranceFor(T)));
@@ -1955,7 +1843,7 @@ pub fn Vector(
             }
 
             const tolerance =
-                if (zm.scalar.isFloat(T))
+                if (zm.isFloat(T))
                     util.toleranceFor(T)
                 else
                     0;
@@ -1964,7 +1852,7 @@ pub fn Vector(
             if (dim >= 2) try std.testing.expect(Vec.unit_y.isNormalized(tolerance));
             if (dim >= 3) try std.testing.expect(Vec.unit_z.isNormalized(tolerance));
             if (dim >= 4) try std.testing.expect(Vec.unit_w.isNormalized(tolerance));
-            if (zm.scalar.isSigned(T)) {
+            if (zm.isSigned(T)) {
                 if (dim >= 1) try std.testing.expect(Vec.unit_neg_x.isNormalized(tolerance));
                 if (dim >= 2) try std.testing.expect(Vec.unit_neg_y.isNormalized(tolerance));
                 if (dim >= 3) try std.testing.expect(Vec.unit_neg_z.isNormalized(tolerance));
@@ -1973,14 +1861,14 @@ pub fn Vector(
         }
 
         test dot {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
 
-            var result = zm.scalar.zeroValue(T);
+            var result = zm.zeroValue(T);
             for (0..dim) |i| result += v1.get(i) * v2.get(i);
 
-            if (zm.scalar.isFloat(T)) {
+            if (zm.isFloat(T)) {
                 try std.testing.expectApproxEqRel(v1.dot(v2), v2.dot(v1), util.toleranceFor(T));
                 try std.testing.expectApproxEqRel(v1.lengthSquared(), v1.dot(v1), util.toleranceFor(T));
                 try std.testing.expectApproxEqAbs(result, v1.dot(v2), util.toleranceFor(T));
@@ -1992,44 +1880,44 @@ pub fn Vector(
         }
 
         test elementSum {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v = util.arbitrary(Vec, 10);
-            var result = zm.scalar.zeroValue(T);
+            var result = zm.zeroValue(T);
             for (0..dim) |i| result += v.get(i);
             try std.testing.expectEqual(result, v.elementSum());
         }
 
         test elementProduct {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v = util.arbitrary(Vec, 10);
-            var result = zm.scalar.oneValue(T);
+            var result = zm.oneValue(T);
             for (0..dim) |i| result *= v.get(i);
             try std.testing.expectEqual(result, v.elementProduct());
         }
 
         test elementMin {
-            if (!zm.scalar.isNumber(T) or dim == 0) return;
+            if (!zm.isNumber(T) or dim == 0) return;
             const v = util.arbitrary(Vec, 10);
-            var result = zm.scalar.maxValue(T);
+            var result = zm.maxValue(T);
             for (0..dim) |i| result = @min(result, v.get(i));
             try std.testing.expectEqual(result, v.elementMin());
         }
 
         test elementMax {
-            if (!zm.scalar.isNumber(T) or dim == 0) return;
+            if (!zm.isNumber(T) or dim == 0) return;
             const v = util.arbitrary(Vec, 10);
-            var result = zm.scalar.minValue(T);
+            var result = zm.minValue(T);
             for (0..dim) |i| result = @max(result, v.get(i));
             try std.testing.expectEqual(result, v.elementMax());
         }
 
         test distanceSquared {
-            if (!zm.scalar.isNumber(T)) return;
+            if (!zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
-            var result = zm.scalar.zeroValue(T);
+            var result = zm.zeroValue(T);
             for (0..dim) |i| {
-                if (zm.scalar.isUnsignedInt(T)) {
+                if (zm.isUnsignedInt(T)) {
                     const t1 = v1.get(i);
                     const t2 = v2.get(i);
                     if (t1 > t2) {
@@ -2041,7 +1929,7 @@ pub fn Vector(
                     result += (v1.get(i) - v2.get(i)) * (v1.get(i) - v2.get(i));
                 }
             }
-            if (zm.scalar.isFloat(T)) {
+            if (zm.isFloat(T)) {
                 try std.testing.expectApproxEqAbs(result, v1.distanceSquared(v2), util.toleranceFor(T));
             } else {
                 try std.testing.expectEqual(result, v1.distanceSquared(v2));
@@ -2049,17 +1937,17 @@ pub fn Vector(
         }
 
         test distance {
-            if (!zm.scalar.isFloat(T)) return;
+            if (!zm.isFloat(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
-            var result = zm.scalar.zeroValue(T);
+            var result = zm.zeroValue(T);
             for (0..dim) |i| result += (v1.get(i) - v2.get(i)) * (v1.get(i) - v2.get(i));
             result = @sqrt(result);
             try std.testing.expectApproxEqRel(result, v1.distance(v2), util.toleranceFor(T));
         }
 
         test isFinite {
-            if (zm.scalar.isFloat(T)) {
+            if (zm.isFloat(T)) {
                 var v = zero;
 
                 if (dim == 0) {
@@ -2076,7 +1964,7 @@ pub fn Vector(
         }
 
         test isNan {
-            if (zm.scalar.isFloat(T)) {
+            if (zm.isFloat(T)) {
                 var v = zero;
 
                 if (dim == 0) {
@@ -2093,13 +1981,13 @@ pub fn Vector(
         }
 
         test cross {
-            if (dim != 3 or !zm.scalar.isSigned(T)) return;
-            const v1 = Vec.initXYZ(zm.scalar.cast(T, 1), zm.scalar.cast(T, 2), zm.scalar.cast(T, 3));
-            const v2 = Vec.initXYZ(zm.scalar.cast(T, 3), zm.scalar.cast(T, 4), zm.scalar.cast(T, 5));
+            if (dim != 3 or !zm.isSigned(T)) return;
+            const v1 = Vec.initXYZ(zm.cast(T, 1), zm.cast(T, 2), zm.cast(T, 3));
+            const v2 = Vec.initXYZ(zm.cast(T, 3), zm.cast(T, 4), zm.cast(T, 5));
             const result = v1.cross(v2);
-            try std.testing.expectEqual(zm.scalar.cast(T, -2), result.x());
-            try std.testing.expectEqual(zm.scalar.cast(T, 4), result.y());
-            try std.testing.expectEqual(zm.scalar.cast(T, -2), result.z());
+            try std.testing.expectEqual(zm.cast(T, -2), result.x());
+            try std.testing.expectEqual(zm.cast(T, 4), result.y());
+            try std.testing.expectEqual(zm.cast(T, -2), result.z());
         }
     };
 }

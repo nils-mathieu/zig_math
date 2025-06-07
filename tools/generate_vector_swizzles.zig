@@ -65,10 +65,10 @@ pub fn main() !void {
     try stdout.writeAll(
         \\const std = @import("std");
         \\const zm = @import("../root.zig");
-        \\const Vector = zm.vec.Vector;
-        \\const VectorRepr = zm.vec.VectorRepr;
+        \\const Vector = zm.Vector;
+        \\const ReprConfig = zm.ReprConfig;
         \\
-        \\pub fn VectorSwizzles(comptime dim: usize, comptime T: type, comptime repr: VectorRepr) type {
+        \\pub fn VectorSwizzles(comptime dim: usize, comptime T: type, comptime repr: ReprConfig) type {
         \\    const Vec = Vector(dim, T, repr);
         \\
         \\    return struct {

@@ -60,7 +60,7 @@ pub fn arbitrary(comptime T: type, amplitude: comptime_int) T {
         },
         .bool => return rng().boolean(),
         .@"struct" => {
-            if (zm.vec.isVector(T)) {
+            if (zm.isVector(T)) {
                 var result: T = undefined;
                 for (0..T.dimension) |i| result.set(i, arbitrary(T.Element, amplitude));
                 return result;

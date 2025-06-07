@@ -1,9 +1,9 @@
 const std = @import("std");
 const zm = @import("../root.zig");
-const Vector = zm.vec.Vector;
-const VectorRepr = zm.vec.VectorRepr;
+const Vector = zm.Vector;
+const ReprConfig = zm.ReprConfig;
 
-pub fn VectorSwizzles(comptime dim: usize, comptime T: type, comptime repr: VectorRepr) type {
+pub fn VectorSwizzles(comptime dim: usize, comptime T: type, comptime repr: ReprConfig) type {
     const Vec = Vector(dim, T, repr);
 
     return struct {
@@ -23,7 +23,7 @@ pub fn VectorSwizzles(comptime dim: usize, comptime T: type, comptime repr: Vect
         pub inline fn x(self: *const @This()) Vector(1, T, repr) {
             const v: *const Vec = @alignCast(@fieldParentPtr("swizzles", self));
             assertDimensionIsAtLeast("swizzles.x()", 1);
-            return v.swizzle(1, .{ 0 });
+            return v.swizzle(1, .{0});
         }
 
         /// Swizzles the vector to a new dimension by selecting a subset of its elements
@@ -33,7 +33,7 @@ pub fn VectorSwizzles(comptime dim: usize, comptime T: type, comptime repr: Vect
         pub inline fn y(self: *const @This()) Vector(1, T, repr) {
             const v: *const Vec = @alignCast(@fieldParentPtr("swizzles", self));
             assertDimensionIsAtLeast("swizzles.y()", 2);
-            return v.swizzle(1, .{ 1 });
+            return v.swizzle(1, .{1});
         }
 
         /// Swizzles the vector to a new dimension by selecting a subset of its elements
@@ -43,7 +43,7 @@ pub fn VectorSwizzles(comptime dim: usize, comptime T: type, comptime repr: Vect
         pub inline fn z(self: *const @This()) Vector(1, T, repr) {
             const v: *const Vec = @alignCast(@fieldParentPtr("swizzles", self));
             assertDimensionIsAtLeast("swizzles.z()", 3);
-            return v.swizzle(1, .{ 2 });
+            return v.swizzle(1, .{2});
         }
 
         /// Swizzles the vector to a new dimension by selecting a subset of its elements
@@ -53,7 +53,7 @@ pub fn VectorSwizzles(comptime dim: usize, comptime T: type, comptime repr: Vect
         pub inline fn w(self: *const @This()) Vector(1, T, repr) {
             const v: *const Vec = @alignCast(@fieldParentPtr("swizzles", self));
             assertDimensionIsAtLeast("swizzles.w()", 4);
-            return v.swizzle(1, .{ 3 });
+            return v.swizzle(1, .{3});
         }
 
         /// Swizzles the vector to a new dimension by selecting a subset of its elements
@@ -3417,4 +3417,3 @@ pub fn VectorSwizzles(comptime dim: usize, comptime T: type, comptime repr: Vect
         }
     };
 }
-
