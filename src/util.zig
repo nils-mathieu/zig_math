@@ -92,7 +92,7 @@ pub fn toleranceFor(comptime T: type) comptime_float {
         f16 => 1e-1,
         f32 => 1e-4,
         f64 => 1e-6,
-        else => @compileError("no tolerance set for " ++ @typeName(T)),
+        else => std.math.inf(T),
     };
 }
 

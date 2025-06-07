@@ -1255,7 +1255,7 @@ pub fn Vector(
         ///
         /// `other` must be normalized.
         pub inline fn projectOntoNormalized(self: Vec, other: Vec) Vec {
-            if (T == f32 or T == f64) std.debug.assert(other.isNormalized(1e-4));
+            std.debug.assert(other.isNormalized(util.toleranceFor(T)));
             return other.mul(self.dot(other));
         }
 
@@ -1383,7 +1383,7 @@ pub fn Vector(
         ///
         /// A normalized vector that is orthogonal to the provided one.
         pub inline fn anyOrthogonalVectorNormalized(self: Vec) Vec {
-            if (T == f32 or T == f64) std.debug.assert(self.isNormalized(util.toleranceFor(T)));
+            std.debug.assert(self.isNormalized(util.toleranceFor(T)));
 
             // From https://graphics.pixar.com/library/OrthonormalB/paper.pdf
             const sign = std.math.sign(self.z());
