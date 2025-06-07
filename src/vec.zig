@@ -1322,6 +1322,30 @@ pub fn Vector(
             return self.mul(other).elementSum();
         }
 
+        /// Computes the cross-product of `self` with `other`.
+        ///
+        /// # Availability
+        ///
+        /// The cross-product is only defined for vectors of dimension 3.
+        pub inline fn cross(self: Vec, other: Vec) Vec {
+            assertDimensionIs("cross()", 3);
+
+            if (Repr == [3]T) {
+                return initXYZ(
+                    self.y() * other.z() - other.y() * self.z(),
+                    self.z() * other.x() - other.z() * self.x(),
+                    self.x() * other.y() - other.x() * self.y(),
+                );
+            } else {
+                const a = @shuffle(T, self.inner, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 }));
+                const b = @shuffle(T, other.inner, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 }));
+                const ab = a * other.inner;
+                const ba = b * self.inner;
+                const s = ab - ba;
+                return .{ .inner = @shuffle(T, s, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 })) };
+            }
+        }
+
         /// Computes the vector projection of `self` onto `other`.
         ///
         /// # Valid Usage
@@ -1440,6 +1464,44 @@ pub fn Vector(
             } else {
                 return self;
             }
+        }
+
+        /// Returns a vector that is orthogonal to this one.
+        ///
+        /// # Valid Usage
+        ///
+        /// The input vector must not be zero.
+        ///
+        /// # Returns
+        ///
+        /// Any vector that is orthogonal to the provided one. Note that the result may or may
+        /// not be normalzied. If you need a normalized output, use
+        /// `anyOrthogonalVectorNormalized`.
+        pub inline fn anyOrthogonalVector(self: Vec) Vec {
+            if (@abs(self.x()) > @abs(self.y())) {
+                return initXYZ(-self.z(), 0.0, self.x()); // self.cross(unit_y)
+            } else {
+                return initXYZ(0.0, self.z(), -self.y()); // self.cross(unit_x)
+            }
+        }
+
+        /// Returns a normalized vector that is orthogonal to this one.
+        ///
+        /// # Valid Usage
+        ///
+        /// The input vector must be normalized.
+        ///
+        /// # Returns
+        ///
+        /// A normalized vector that is orthogonal to the provided one.
+        pub inline fn anyOrthogonalVectorNormalized(self: Vec) Vec {
+            if (T == f32 or T == f64) std.debug.assert(self.isNormalized(util.toleranceFor(T)));
+
+            // From https://graphics.pixar.com/library/OrthonormalB/paper.pdf
+            const sign = std.math.sign(self.z());
+            const a = -1.0 / (sign + self.z());
+            const b = self.x() * self.y() * a;
+            return initXYZ(b, sign + self.y() * self.y() * a, -self.y());
         }
 
         // =========================================================================================
@@ -2028,6 +2090,16 @@ pub fn Vector(
                 const v = util.arbitrary(Vec, 1000);
                 try std.testing.expect(!v.isNan());
             }
+        }
+
+        test cross {
+            if (dim != 3 or !zm.scalar.isSigned(T)) return;
+            const v1 = Vec.initXYZ(zm.scalar.cast(T, 1), zm.scalar.cast(T, 2), zm.scalar.cast(T, 3));
+            const v2 = Vec.initXYZ(zm.scalar.cast(T, 3), zm.scalar.cast(T, 4), zm.scalar.cast(T, 5));
+            const result = v1.cross(v2);
+            try std.testing.expectEqual(zm.scalar.cast(T, -2), result.x());
+            try std.testing.expectEqual(zm.scalar.cast(T, 4), result.y());
+            try std.testing.expectEqual(zm.scalar.cast(T, -2), result.z());
         }
     };
 }

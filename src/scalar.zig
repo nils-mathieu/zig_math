@@ -30,6 +30,10 @@ pub inline fn isSimdCompatible(comptime T: type) bool {
     }
 }
 
+// =================================================================================================
+// Constants
+// =================================================================================================
+
 /// Returns the additive identity of the provided type.
 ///
 /// # Supported types
@@ -118,6 +122,10 @@ pub inline fn minValue(comptime T: type) T {
     };
 }
 
+// =================================================================================================
+// Numeric Traits
+// =================================================================================================
+
 /// Returns whether the type `T` is a floating-point type.
 ///
 /// Note that `comptime_float` is also considered a floating-point type.
@@ -168,6 +176,53 @@ pub inline fn isSigned(comptime T: type) bool {
         .float, .comptime_float, .comptime_int => true,
         else => false,
     };
+}
+
+// =================================================================================================
+// Cast
+// =================================================================================================
+
+/// Attempts to cast the provided value `val` to an instance of `T`.
+///
+/// # Behavior
+///
+/// When converting from two integer types, this function behaves like `@intCast`, meaning it
+/// invokes safety-checked undefined behavior if the value cannot be represented in the target
+/// type.
+///
+/// When converting from two floating-point types, this function behaves like `@floatCast`.
+///
+/// When converting from an integer to a floating-point type, this function behaves like
+/// `@floatFromInt`.
+///
+/// When converting from a floating-point type to an integer, this function behaves like
+/// `@intFromFloat`.
+///
+/// # Returns
+///
+/// This function returns the result of the conversion, or produces a compile-time error if the
+/// conversion is not possible.
+pub fn cast(comptime T: type, val: anytype) T {
+    const S = @TypeOf(val);
+
+    switch (@typeInfo(T)) {
+        .int, .comptime_int => switch (@typeInfo(S)) {
+            .int, .comptime_int => return @intCast(val),
+            .float, .comptime_float => return @intFromFloat(val),
+            .bool => return @intFromBool(val),
+            else => {},
+        },
+        .float, .comptime_float => switch (@typeInfo(S)) {
+            .int, .comptime_int => return @floatFromInt(val),
+            .float, .comptime_float => return @floatCast(val),
+            .bool => return @floatFromInt(@intFromBool(val)),
+            else => {},
+        },
+        else => {},
+    }
+
+    const err = "Can't convert `" ++ @typeName(S) ++ "` to `" ++ @typeName(T) ++ "`";
+    @compileError(err);
 }
 
 // =================================================================================================
