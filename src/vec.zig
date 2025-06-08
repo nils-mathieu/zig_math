@@ -5,6 +5,14 @@ const util = @import("util.zig");
 const ReprConfig = zm.ReprConfig;
 const VectorSwizzles = @import("gen/vector_swizzles.zig").VectorSwizzles;
 
+/// A possible layout selected to represent a vector.
+const VectorLayout = enum {
+    /// An array of elements is used.
+    array,
+    /// A SIMD vector is used.
+    simd,
+};
+
 /// Creates a vector type with the specified element type and dimension.
 ///
 /// # Parameters
@@ -38,9 +46,9 @@ pub fn Vector(
         /// The element type of the vector.
         pub const Element = T;
 
-        /// The type responsible for representing the concrete data of the vector.
+        /// The layout used to represent the concrete data of the vector.
         ///
-        /// The exact type selected here depends on the `repr` parameter provided when
+        /// The exact value selected here depends on the `repr` parameter provided when
         /// creating the vector type, and the element type `T`.
         ///
         /// # Possible Values
@@ -48,37 +56,37 @@ pub fn Vector(
         /// This should generally be considered implementation details, but for documentation
         /// purposes, here is how the type is selected at the moment:
         ///
-        /// `@Vector(dim, T)` is used if:
+        /// `.simd` is used if:
         ///
         /// 1. The element type `T` is SIMD-compatible.
         /// 2. Using `@Vector(dim, T)` is compatible with the requested layout constraints (see
         ///    `VectorRepr`).
         ///
-        /// Otherwise, `[dim]T` is used.
-        pub const Repr = blk: {
+        /// Otherwise, `.array` is used.
+        pub const layout: VectorLayout = blk: {
             // If the dimension is zero, we have no elements to store, but we still want the
             // final vector to be correctly aligned.
-            if (dim == 0) break :blk [0]T;
+            if (dim == 0) break :blk .array;
 
             // If `T` cannot be used with SIMD, use a regular array.
-            if (!zm.isSimdCompatible(T)) break :blk [dim]T;
+            if (!zm.isSimdCompatible(T)) break :blk .array;
 
             const Simd = @Vector(dim, T);
             const Array = [dim]T;
 
             // If we can't preserve natural alignment, use a regular array.
             if (repr.preserve_alignment and @alignOf(Simd) != @alignOf(Array)) {
-                break :blk Array;
+                break :blk .array;
             }
 
             // If we have to introduce padding bytes, or if the vector packs multiple elements into
             // a single byte, use a regular array.
             if (repr.preserve_size and @sizeOf(Simd) != @sizeOf(Array)) {
-                break :blk Array;
+                break :blk .array;
             }
 
             // Otherwise, we can use a SIMD vector.
-            break :blk Simd;
+            break :blk .simd;
         };
 
         // =========================================================================================
@@ -89,8 +97,13 @@ pub fn Vector(
         // This zero-sized field should not have any impact on the type's final layout.
         swizzles: VectorSwizzles(dim, T, repr) = .{},
 
-        /// The underlying data representation of the vector. See `Repr` for more information.
-        inner: Repr,
+        /// The underlying data representation of the vector.
+        ///
+        /// See `layout` for more information.
+        inner: switch (layout) {
+            .array => [dim]T,
+            .simd => @Vector(dim, T),
+        },
 
         // =========================================================================================
         // Constructors and default constants
@@ -145,23 +158,14 @@ pub fn Vector(
         pub const unit_neg_w = unit(3).neg();
 
         /// A vector with all elements set to `NaN`.
-        ///
-        /// # Details
-        ///
-        /// * For **integers**, this corresponds to the smallest possible value.
-        ///
-        /// * For **floating-point numbers**, this corresponds to the negative infinity.
-        ///
-        /// * For **booleans**, this corresponds to `false`.
         pub const nan = splat(std.math.nan(T));
 
         /// Creates a new vector with all elements set to the given value.
         pub inline fn splat(value: T) Vec {
-            if (Repr == [dim]T) {
-                return .{ .inner = [1]T{value} ** dim };
-            } else {
-                return .{ .inner = @splat(value) };
-            }
+            return switch (layout) {
+                .array => .{ .inner = [1]T{value} ** dim },
+                .simd => .{ .inner = @splat(value) },
+            };
         }
 
         /// Creates a new unit vector in the given direction.
@@ -354,17 +358,16 @@ pub fn Vector(
                 }
             }
 
-            if (Repr == [dim]T) {
-                // Array-based implementation
-
-                var result: Vector(new_dim, T, repr) = undefined;
-                inline for (indices, 0..) |i, j| result.set(j, self.get(i));
-                return result;
-            } else {
-                // SIMD-based implementation
-
-                const v = @shuffle(T, self.inner, undefined, indices);
-                return .{ .inner = v };
+            switch (layout) {
+                .array => {
+                    var result: Vector(new_dim, T, repr) = undefined;
+                    inline for (indices, 0..) |i, j| result.set(j, self.get(i));
+                    return result;
+                },
+                .simd => {
+                    const v = @shuffle(T, self.inner, undefined, indices);
+                    return .{ .inner = v };
+                },
             }
         }
 
@@ -1240,19 +1243,22 @@ pub fn Vector(
         pub inline fn cross(self: Vec, other: Vec) Vec {
             assertDimensionIs("cross()", 3);
 
-            if (Repr == [3]T) {
-                return initXYZ(
-                    self.y() * other.z() - other.y() * self.z(),
-                    self.z() * other.x() - other.z() * self.x(),
-                    self.x() * other.y() - other.x() * self.y(),
-                );
-            } else {
-                const a = @shuffle(T, self.inner, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 }));
-                const b = @shuffle(T, other.inner, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 }));
-                const ab = a * other.inner;
-                const ba = b * self.inner;
-                const s = ab - ba;
-                return .{ .inner = @shuffle(T, s, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 })) };
+            switch (layout) {
+                .array => {
+                    return initXYZ(
+                        self.y() * other.z() - other.y() * self.z(),
+                        self.z() * other.x() - other.z() * self.x(),
+                        self.x() * other.y() - other.x() * self.y(),
+                    );
+                },
+                .simd => {
+                    const a = @shuffle(T, self.inner, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 }));
+                    const b = @shuffle(T, other.inner, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 }));
+                    const ab = a * other.inner;
+                    const ba = b * self.inner;
+                    const s = ab - ba;
+                    return .{ .inner = @shuffle(T, s, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 })) };
+                },
             }
         }
 
