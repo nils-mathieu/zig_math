@@ -108,13 +108,68 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
             return init(0.0, 0.0, @sin(half), @cos(half));
         }
 
+        /// Computes the product of two quaternions.
+        ///
+        /// # Interpretation
+        ///
+        /// The resulting rotation can be interpreted either as:
+        ///
+        /// 1. The rotation of `self` on its own axis by the angle of `other`.
+        /// 2. The rotation of `other` by `self` on `self`'s axis.
+        pub inline fn mul(self: Quat, other: Quat) Quat {
+            // https://github.com/bitshifter/glam-rs/blob/600b139ef2c3fb1bb9529cfd4d9c53308c038021/src/f32/coresimd/quat.rs#L769-L801
+
+            const Simd = @Vector(4, T);
+
+            const lhs: Simd = self.inner.toSimd();
+            const rhs: Simd = other.inner.toSimd();
+
+            const control_wzyx: Simd = .{ 1.0, -1.0, 1.0, -1.0 };
+            const control_zwxy: Simd = .{ 1.0, 1.0, -1.0, -1.0 };
+            const control_yxwz: Simd = .{ -1.0, 1.0, 1.0, -1.0 };
+
+            const r_xxxx: Simd = @splat(lhs[0]);
+            const r_yyyy: Simd = @splat(lhs[1]);
+            const r_zzzz: Simd = @splat(lhs[2]);
+            const r_wwww: Simd = @splat(lhs[3]);
+
+            const lxrw_lyrw_lzrw_lwrw = r_wwww * rhs;
+            const l_wzyx: Simd = @shuffle(T, rhs, undefined, .{ 3, 2, 1, 0 });
+
+            const lwrx_lzrx_lyrx_lxrx = r_xxxx * l_wzyx;
+            const l_zwxy: Simd = @shuffle(T, l_wzyx, undefined, .{ 1, 0, 3, 2 });
+
+            const lwrx_nlzrx_lyrx_nlxrx = lwrx_lzrx_lyrx_lxrx * control_wzyx;
+
+            const lzry_lwry_lxry_lyry = r_yyyy * l_zwxy;
+            const l_yxwz: Simd = @shuffle(T, l_zwxy, undefined, .{ 3, 2, 1, 0 });
+
+            const lzry_lwry_nlxry_nlyry = lzry_lwry_lxry_lyry * control_zwxy;
+
+            const lyrz_lxrz_lwrz_lzrz = r_zzzz * l_yxwz;
+            const result0 = lxrw_lyrw_lzrw_lwrw + lwrx_nlzrx_lyrx_nlxrx;
+
+            const nlyrz_lxrz_lwrz_wlzrz = lyrz_lxrz_lwrz_lzrz * control_yxwz;
+            const result1 = lzry_lwry_nlxry_nlyry + nlyrz_lxrz_lwrz_wlzrz;
+            return .{ .inner = .{ .inner = result0 + result1 } };
+        }
+
         // =========================================================================================
         // Predicates
         // =========================================================================================
 
-        /// Returns whether the quaternion is normalized.
+        /// Returns whether the quaternion is normalized (has a length of 1).
         pub inline fn isNormalized(self: Quat, tolerance: T) bool {
             return self.inner.isNormalized(tolerance);
+        }
+
+        /// Normalizes the quaternion.
+        ///
+        /// # Valid Usage
+        ///
+        /// The caller must ensure that the quaternion is not zero.
+        pub inline fn normalize(self: Quat) Quat {
+            return fromVec4(self.inner.normalize());
         }
     };
 }

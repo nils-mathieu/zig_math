@@ -5,6 +5,8 @@ const util = @import("util.zig");
 const ReprConfig = zm.ReprConfig;
 const Vector = zm.Vector;
 const Quaternion = zm.Quaternion;
+const Handedness = zm.Handedness;
+const Affine = zm.Affine;
 
 /// Represents a possible layout for a matrix created through the `Matrix` function.
 pub const MatrixLayout = enum {
@@ -23,6 +25,7 @@ pub const MatrixLayout = enum {
 /// Creates a new matrix type with the given dimensions, element type, and representation.
 pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime repr: ReprConfig) type {
     const Quat = Quaternion(T, repr);
+    const Vec3 = zm.Vector(3, T, repr);
 
     return extern struct {
         const Mat = @This();
@@ -289,19 +292,8 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         // =========================================================================================
-        // 3D Constructors
+        // Linear Transformations
         // =========================================================================================
-
-        /// Creates a new affine transformation from a linear transformation created through
-        /// the `name` function.
-        inline fn linearToAffine(comptime name: []const u8, args: anytype) Mat {
-            const linear = @call(
-                .always_inline,
-                @field(Matrix(rows - 1, columns - 1, T, .optimize), name),
-                args,
-            );
-            return linear.extend().toRepr(repr);
-        }
 
         /// Creates a new rotation matrix from the provided quaternion.
         ///
@@ -313,37 +305,52 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
 
             std.debug.assert(quat.isNormalized(util.toleranceFor(T)));
 
-            if (rows == 3) {
-                const x = quat.inner.x();
-                const y = quat.inner.y();
-                const z = quat.inner.z();
-                const w = quat.inner.w();
+            const x = quat.inner.x();
+            const y = quat.inner.y();
+            const z = quat.inner.z();
+            const w = quat.inner.w();
 
-                const x2 = x + x;
-                const y2 = y + y;
-                const z2 = z + z;
+            const x2 = x + x;
+            const y2 = y + y;
+            const z2 = z + z;
 
-                const xx = x * x2;
-                const xy = x * y2;
-                const xz = x * z2;
+            const xx = x * x2;
+            const xy = x * y2;
+            const xz = x * z2;
 
-                const yy = y * y2;
-                const yz = y * z2;
+            const yy = y * y2;
+            const yz = y * z2;
 
-                const zz = z * z2;
+            const zz = z * z2;
 
-                const wx = w * x2;
-                const wy = w * y2;
-                const wz = w * z2;
+            const wx = w * x2;
+            const wy = w * y2;
+            const wz = w * z2;
 
-                return fromColumnMajorData(.{
-                    1.0 - (yy + zz), xy + wz,         xz - wy,
-                    xy - wz,         1.0 - (xx + zz), yz + wx,
-                    xz + wy,         yz - wx,         1.0 - (xx + yy),
-                });
-            } else {
-                return linearToAffine("fromQuat", .{quat.toRepr(.optimize)});
-            }
+            const a1 = 1.0 - (yy + zz);
+            const b1 = xy + wz;
+            const c1 = xz - wy;
+            const a2 = xy - wz;
+            const b2 = 1.0 - (xx + zz);
+            const c2 = yz + wx;
+            const a3 = xz + wy;
+            const b3 = yz - wx;
+            const c3 = 1.0 - (xx + yy);
+
+            return switch (rows) {
+                3 => fromColumnMajorData(.{
+                    a1, b1, c1,
+                    a2, b2, c2,
+                    a3, b3, c3,
+                }),
+                4 => fromColumnMajorData(.{
+                    a1,  b1,  c1,  0.0,
+                    a2,  b2,  c2,  0.0,
+                    a3,  b3,  c3,  0.0,
+                    0.0, 0.0, 0.0, 1.0,
+                }),
+                else => unreachable,
+            };
         }
 
         /// Creates a new matrix representing a rotation of `angle` radians around the X axis.
@@ -354,18 +361,23 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         pub inline fn fromRotationX(angle: T) Mat {
             assertMatrixLinear3D("fromQuat()");
 
-            if (rows == 3) {
-                const sin = @sin(angle);
-                const cos = @cos(angle);
+            const sin = @sin(angle);
+            const cos = @cos(angle);
 
-                return fromColumnMajorData(.{
+            return switch (rows) {
+                3 => fromColumnMajorData(.{
                     1.0, 0.0,  0.0,
                     0.0, cos,  sin,
                     0.0, -sin, cos,
-                });
-            } else {
-                return linearToAffine("fromRotationX", .{angle});
-            }
+                }),
+                4 => fromColumnMajorData(.{
+                    1.0, 0.0,  0.0, 0.0,
+                    0.0, cos,  sin, 0.0,
+                    0.0, -sin, cos, 0.0,
+                    0.0, 0.0,  0.0, 1.0,
+                }),
+                else => unreachable,
+            };
         }
 
         /// Creates a new matrix representing a rotation of `angle` radians around the Y axis.
@@ -376,40 +388,54 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         pub inline fn fromRotationY(angle: T) Mat {
             assertMatrixLinear3D("fromQuat()");
 
-            if (rows == 3) {
-                const sin = @sin(angle);
-                const cos = @cos(angle);
+            const sin = @sin(angle);
+            const cos = @cos(angle);
 
-                return fromColumnMajorData(.{
+            return switch (rows) {
+                3 => fromColumnMajorData(.{
                     cos, 0.0, -sin,
                     0.0, 1.0, 0.0,
                     sin, 0.0, cos,
-                });
-            } else {
-                return linearToAffine("fromRotationY", .{angle});
-            }
+                }),
+                4 => fromColumnMajorData(.{
+                    cos, 0.0, -sin, 0.0,
+                    0.0, 1.0, 0.0,  0.0,
+                    sin, 0.0, cos,  0.0,
+                    0.0, 0.0, 0.0,  1.0,
+                }),
+                else => unreachable,
+            };
         }
 
         /// Creates a new matrix representing a rotation of `angle` radians around the Z axis.
         ///
         /// # Availability
         ///
-        /// This function is only available for 3x3 and 4x4 matrices.
+        /// This function is only available for 2x2, 3x3 and 4x4 matrices.
         pub inline fn fromRotationZ(angle: T) Mat {
-            assertMatrixLinear3D("fromQuat()");
+            assertMatrixLinear2D("fromQuat()");
 
-            if (rows == 3) {
-                const sin = @sin(angle);
-                const cos = @cos(angle);
+            const sin = @sin(angle);
+            const cos = @cos(angle);
 
-                return fromColumnMajorData(.{
+            return switch (rows) {
+                2 => fromColumnMajorData(.{
+                    cos,  sin,
+                    -sin, cos,
+                }),
+                3 => fromColumnMajorData(.{
                     cos,  sin, 0.0,
                     -sin, cos, 0.0,
                     0.0,  0.0, 1.0,
-                });
-            } else {
-                return linearToAffine("fromRotationZ", .{angle});
-            }
+                }),
+                4 => fromColumnMajorData(.{
+                    cos,  sin, 0.0, 0.0,
+                    -sin, cos, 0.0, 0.0,
+                    0.0,  0.0, 1.0, 0.0,
+                    0.0,  0.0, 0.0, 1.0,
+                }),
+                else => unreachable,
+            };
         }
 
         /// Creates a new translation matrix.
@@ -442,6 +468,162 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         pub inline fn fromXYZ(x: T, y: T, z: T) Mat {
             assertSizeIs("fromXYZ()", 4, 4);
             return fromTranslation(.initXYZ(x, y, z));
+        }
+
+        // =========================================================================================
+        // Affine Transformations
+        // =========================================================================================
+
+        /// Creates a new view matrix.
+        ///
+        /// # Parameters
+        ///
+        /// - `eye`: The eye position of the camera.
+        ///
+        /// - `dir`: The direction in which the camera is facing.
+        ///
+        /// - `up`: The up direction of the camera.
+        ///
+        /// - `handedness`: Whether the resulting coordinate system should be right-handed
+        ///   or left-handed.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for 4x4 matrices.
+        pub inline fn lookTo(
+            eye: Vec3,
+            dir: Vec3,
+            up: Vec3,
+            handedness: Handedness,
+        ) Mat {
+            assertSizeIs("lookTo()", 4, 4);
+            return Affine(3, T, .optimize).lookTo(eye, dir, up, handedness).toMatWithRepr(repr);
+        }
+
+        /// Creates a look-at matrix from the provided parameters.
+        ///
+        /// # Parameters
+        ///
+        /// - `eye`: The position of the camera.
+        ///
+        /// - `center`: The point the camera is looking at. This cannot be equal to `eye`.
+        ///
+        /// - `up`: The up direction of the camera.
+        ///
+        /// - `handedness`: Whether the resulting coordinate system should be right-handed
+        ///   or left-handed.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for 4x4 matrices.
+        pub inline fn lookAt(
+            eye: Vec3,
+            center: Vec3,
+            up: Vec3,
+            handedness: Handedness,
+        ) Mat {
+            return lookTo(eye, center.sub(eye).normalize(), up, handedness);
+        }
+
+        // =========================================================================================
+        // Perspective Transformations
+        // =========================================================================================
+
+        /// Creates a new perspective matrix.
+        ///
+        /// # Parameters
+        ///
+        /// - `scale_x`: The scale factor for the X axis. Used to convert the X coordinate of
+        ///   the source space to the X coordinate of the destination space. The transformation
+        ///   is done around the axis itself.
+        ///
+        /// - `scale_y`: The scale factor for the Y axis. Used to convert the Y coordinate of
+        ///   the source space to the Y coordinate of the destination space. The transformation
+        ///   is done around the axis itself.
+        ///
+        /// - `z_far`: The distance to the far-plane in the source space. If `null`, the far-plane
+        ///   is at infinity. Both `z_far` and `z_near` cannot be zero together.
+        ///
+        /// - `z_near`: The distance to the near-plane in the source space. If `null`, the
+        ///   near-plane is at infinity. Both `z_far` and `z_near` cannot be zero together.
+        ///
+        /// - `clip_near`: The distance to the clip-plane in the destination space.
+        ///
+        /// - `clip_far`: The distance to the far-plane in the destination space.
+        ///
+        /// - `handedness`: The handedness of the source coordinate system. Check the documentation
+        ///   for `Handedness` for more information.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available with 4x4 matrices.
+        pub inline fn perspective(
+            scale_x: T,
+            scale_y: T,
+            z_near: ?T,
+            z_far: ?T,
+            clip_near: T,
+            clip_far: T,
+            handedness: Handedness,
+        ) Mat {
+            assertSizeIs("perspective()", 4, 4);
+
+            std.debug.assert(z_near != null or z_far != null);
+
+            const e = switch (handedness) {
+                .left_handed => 1.0,
+                .right_handed => -1.0,
+            };
+
+            const scale_z =
+                if (z_far != null and z_near != null)
+                    ((z_far.? * clip_far) - (z_near.? * clip_near)) / (z_far.? - z_near.?)
+                else if (z_far != null)
+                    clip_far
+                else if (z_near != null)
+                    clip_near
+                else
+                    unreachable;
+
+            const scale_z2 =
+                if (z_near != null)
+                    (clip_near - scale_z) * z_near.?
+                else if (z_far != null)
+                    (clip_far - scale_z) * z_far.?
+                else
+                    unreachable;
+
+            return fromColumnMajorData(.{
+                scale_x, 0.0,     0.0,         0.0,
+                0.0,     scale_y, 0.0,         0.0,
+                0.0,     0.0,     scale_z * e, e,
+                0.0,     0.0,     scale_z2,    0.0,
+            });
+        }
+
+        /// Computes a perspective matrix like the OpenGL `gluPerspective` function.
+        ///
+        /// https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluPerspective.xml
+        ///
+        /// # Parameters
+        ///
+        /// - `fov_y`: The vertical field of view in radians.
+        ///
+        /// - `aspect_ratio`: The aspect ratio of the output viewport.
+        ///
+        /// - `z_near`: The  distance to the near clipping plane in the source space.
+        ///
+        /// - `z_far`: The distance to the far clipping plane in the source space.
+        ///
+        /// # Returns
+        ///
+        /// This function returns a right-handed perspective matrix that maps the source space's
+        /// depth to the range [-1, 1], as OpenGL normally expects.
+        pub inline fn perspectiveGl(fov_y: T, aspect_ratio: T, z_near: T, z_far: T) Mat {
+            const half_fov = fov_y * 0.5;
+            const scale_y = @cos(half_fov) / @sin(half_fov); // 1.0 / tan(half_fov)
+            const scale_x = scale_y / aspect_ratio;
+            return perspective(scale_x, scale_y, z_near, z_far, -1.0, 1.0, .right_handed);
         }
 
         // =========================================================================================
@@ -628,6 +810,14 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             }
         }
 
+        /// Asserts that the matrix is either 2x2, 3x3 or 4x4.
+        inline fn assertMatrixLinear2D(comptime symbol: []const u8) void {
+            if (@inComptime() and (rows != 2 or columns != 2) and (rows != 3 or columns != 3) and (rows != 4 or columns != 4)) {
+                const err = std.fmt.comptimePrint("`{s}` can only be used with a matrix of size 2x2, 3x3 or 4x4", .{symbol});
+                @compileError(err);
+            }
+        }
+
         inline fn assertSizeIs(comptime symbol: []const u8, expected_rows: usize, expected_columns: usize) void {
             if (@inComptime() and (rows != expected_rows or columns != expected_columns)) {
                 const err = std.fmt.comptimePrint(
@@ -636,6 +826,26 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
                 );
                 @compileError(err);
             }
+        }
+
+        // =========================================================================================
+        // Other
+        // =========================================================================================
+
+        /// Formats the matrix to the provided writer.
+        pub fn format(self: Mat, comptime fmt: []const u8, opts: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = opts;
+
+            try writer.writeAll("[\n");
+            for (0..rows) |i| {
+                try writer.writeAll("    ");
+                for (0..columns) |j| {
+                    try std.fmt.formatType(self.get(i, j), fmt, .{ .width = 5, .alignment = .right, .precision = 2 }, writer, std.options.fmt_max_depth);
+                    try writer.writeAll(" ");
+                }
+                try writer.writeAll("\n");
+            }
+            try writer.writeAll("]");
         }
 
         // Implementation detail used by some functions to determine whether a type is a matrix.
@@ -883,6 +1093,29 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
             try std.testing.expectEqual(zm.zeroValue(T), m2.get(2, 0));
             try std.testing.expectEqual(zm.zeroValue(T), m2.get(2, 1));
             try std.testing.expectEqual(zm.oneValue(T), m2.get(2, 2));
+        }
+
+        test "perspectiveGl" {
+            if (!zm.isFloat(T)) return;
+
+            const m = Mat4.perspectiveGl(std.math.degreesToRadians(45.0), 2.0, 1.0, 10.0);
+
+            try std.testing.expectApproxEqRel(t(1.21), m.get(0, 0), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(1, 0), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(2, 0), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(3, 0), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(0, 1), 0.1);
+            try std.testing.expectApproxEqRel(t(2.41), m.get(1, 1), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(2, 1), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(3, 1), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(0, 2), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(1, 2), 0.1);
+            try std.testing.expectApproxEqRel(t(-1.22), m.get(2, 2), 0.1);
+            try std.testing.expectApproxEqRel(t(-1.0), m.get(3, 2), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(0, 3), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(1, 3), 0.1);
+            try std.testing.expectApproxEqRel(t(-2.22), m.get(2, 3), 0.1);
+            try std.testing.expectApproxEqRel(t(0.0), m.get(3, 3), 0.1);
         }
     };
 }

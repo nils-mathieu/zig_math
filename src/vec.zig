@@ -368,6 +368,15 @@ pub fn Vector(
             }
         }
 
+        /// Converts the vector to a SIMD vector.
+        ///
+        /// # Availability
+        ///
+        /// This function is only avaialble for types that support SIMD operations.
+        pub inline fn toSimd(self: Vec) @Vector(dim, T) {
+            return self.inner;
+        }
+
         // =========================================================================================
         // Arithmetic
         // =========================================================================================
@@ -1163,7 +1172,8 @@ pub fn Vector(
 
             if (zm.isFloat(T)) {
                 // NOTE: We're multiplying the tolerance by 2.0 to account for the fact that
-                // we are working with squared lengths here.
+                // we are working with squared lengths here. It doesn't perfectly account for
+                // the skewed space, but it's a good enough approximation.
                 return @abs(self.lengthSquared() - 1.0) <= tolerance * 2.0;
             }
 

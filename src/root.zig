@@ -133,6 +133,51 @@ pub const Handedness = enum {
     left_handed,
 };
 
+/// The order in which 3D rotations can be applied.
+///
+/// # Extrinsic vs Intrinsic rotations
+///
+/// There are two conventions for interpreting Euler angles:
+///
+/// **Extrinsic rotations** (also called "world rotations" or "fixed frame rotations"):
+/// - Rotations are applied relative to the fixed global coordinate system
+/// - Each rotation axis remains fixed in space
+/// - The rotation order XYZ means: first rotate around the global X axis,
+///   then around the global Y axis, then around the global Z axis
+///
+/// **Intrinsic rotations** (also called "body rotations" or "moving frame rotations"):
+/// - Rotations are applied relative to the rotating object's local coordinate system
+/// - Each rotation axis moves with the object as it rotates
+/// - The rotation order XYZ means: first rotate around the object's local X axis,
+///   then around the object's new local Y axis, then around the object's final local Z axis
+///
+/// The names in this enumeration (xyz, xzy, etc.) are **implied to be extrinsic rotations**.
+///
+/// ## Converting between extrinsic and intrinsic
+///
+/// You can convert between extrinsic and intrinsic rotations by **swapping the first and last elements**
+/// of the rotation order:
+/// - Extrinsic XYZ = Intrinsic ZYX
+/// - Extrinsic XZY = Intrinsic YZX
+/// - Extrinsic YXZ = Intrinsic ZXY
+/// - Extrinsic YZX = Intrinsic XZY
+/// - Extrinsic ZXY = Intrinsic YXZ
+/// - Extrinsic ZYX = Intrinsic XYZ
+pub const EulerOrder = enum {
+    /// Rotate around X axis, then Y axis, then Z axis (extrinsic)
+    xyz,
+    /// Rotate around X axis, then Z axis, then Y axis (extrinsic)
+    xzy,
+    /// Rotate around Y axis, then X axis, then Z axis (extrinsic)
+    yxz,
+    /// Rotate around Y axis, then Z axis, then X axis (extrinsic)
+    yzx,
+    /// Rotate around Z axis, then X axis, then Y axis (extrinsic)
+    zxy,
+    /// Rotate around Z axis, then Y axis, then X axis (extrinsic)
+    zyx,
+};
+
 // =================================================================================================
 // Vectors
 // =================================================================================================
