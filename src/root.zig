@@ -172,6 +172,13 @@ pub const Mat4d = Matrix(4, 4, f64, .auto);
 // Affine
 // =================================================================================================
 
+pub const Affine = @import("aff.zig").Affine;
+
+pub const Aff2f = Affine(2, f32, .auto);
+pub const Aff2d = Affine(2, f64, .auto);
+pub const Aff3f = Affine(3, f32, .auto);
+pub const Aff3d = Affine(3, f64, .auto);
+
 // =================================================================================================
 // Quaternions
 // =================================================================================================
@@ -430,6 +437,7 @@ test {
     _ = @import("vec.zig");
     _ = @import("mat.zig");
     _ = @import("quat.zig");
+    _ = @import("aff.zig");
 }
 
 test isSimdCompatible {

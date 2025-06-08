@@ -314,8 +314,6 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             std.debug.assert(quat.isNormalized(util.toleranceFor(T)));
 
             if (rows == 3) {
-                // 3D linear
-
                 const x = quat.inner.x();
                 const y = quat.inner.y();
                 const z = quat.inner.z();
@@ -344,8 +342,6 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
                     xz + wy,         yz - wx,         1.0 - (xx + yy),
                 });
             } else {
-                // 3D affine
-
                 return linearToAffine("fromQuat", .{quat.toRepr(.optimize)});
             }
         }
@@ -368,8 +364,6 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
                     0.0, -sin, cos,
                 });
             } else {
-                // 3D affine
-
                 return linearToAffine("fromRotationX", .{angle});
             }
         }
@@ -392,8 +386,6 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
                     sin, 0.0, cos,
                 });
             } else {
-                // 3D affine
-
                 return linearToAffine("fromRotationY", .{angle});
             }
         }
@@ -416,8 +408,6 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
                     0.0,  0.0, 1.0,
                 });
             } else {
-                // 3D affine
-
                 return linearToAffine("fromRotationZ", .{angle});
             }
         }
