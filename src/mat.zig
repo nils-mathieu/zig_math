@@ -4,6 +4,7 @@ const util = @import("util.zig");
 
 const ReprConfig = zm.ReprConfig;
 const Vector = zm.Vector;
+const Quaternion = zm.Quaternion;
 
 /// Represents a possible layout for a matrix created through the `Matrix` function.
 pub const MatrixLayout = enum {
@@ -21,6 +22,8 @@ pub const MatrixLayout = enum {
 
 /// Creates a new matrix type with the given dimensions, element type, and representation.
 pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime repr: ReprConfig) type {
+    const Quat = Quaternion(T, repr);
+
     return extern struct {
         const Mat = @This();
 
@@ -120,7 +123,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         pub inline fn fromColumnMajorData(data: [columns * rows]T) Mat {
             switch (layout) {
                 .array_of_columns => {
-                    if (@sizeOf([columns * rows]T) == @sizeOf([columns]Column)) {
+                    if (@bitSizeOf([columns * rows]T) == @bitSizeOf([columns]Column)) {
                         return @bitCast(data);
                     } else {
                         var result: Mat = undefined;
@@ -142,6 +145,59 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
                 .array_of_columns => return Mat{ .inner = data },
                 .mat2x2_vectorized => return Mat{ .inner = data[0].inner ++ data[1].inner },
             }
+        }
+
+        // =========================================================================================
+        // Conversions
+        // =========================================================================================
+
+        /// Creates a new matrix with the same data as this one, but with a different
+        /// representation configuration.
+        pub inline fn toRepr(self: Mat, comptime new_repr: ReprConfig) Matrix(rows, columns, T, new_repr) {
+            if (comptime new_repr.eql(repr)) return self;
+
+            var result: Matrix(rows, columns, T, new_repr) = undefined;
+            for (0..columns) |col| {
+                result.setColumn(col, self.getColumn(col).toRepr(new_repr));
+            }
+            return result;
+        }
+
+        /// Extends the matrix's dimension by adding a row and a column with the value of the
+        /// identity matrix.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for square matrices.
+        pub inline fn extend(self: Mat) Matrix(rows + 1, columns + 1, T, repr) {
+            assertSquare("extend()");
+
+            const NewMat = Matrix(rows + 1, columns + 1, T, repr);
+
+            // Optimization for when the conversion if from 3x3 to 4x4 and the 3x3 one uses an
+            // optimized layout. In that specific case, the 3D vectors of the matrix actually
+            // have the same size as the 4D vectors of the 4x4 matrix. We just need to initialize
+            // the rows and columns with the identity matrix.
+            if (rows == 3 and columns == 3 and
+                layout == .array_of_columns and NewMat.layout == .array_of_columns and
+                @sizeOf(NewMat) + @sizeOf(Column) == @sizeOf(Mat))
+            {
+                const result: NewMat = @bitCast(self);
+                @memcpy(std.mem.asBytes(&result), std.mem.asBytes(&self));
+
+                // Fill uninitialized elements.
+                result.set(3, 0, zm.zeroValue(T));
+                result.set(3, 1, zm.zeroValue(T));
+                result.set(3, 2, zm.oneValue(T));
+                result.setColumn(3, .unit_w);
+            }
+
+            var result: NewMat = undefined;
+            for (0..columns) |column| {
+                result.setColumn(column, self.getColumn(column).extend(zm.zeroValue(T)));
+            }
+            result.setColumn(columns, .unit(columns));
+            return result;
         }
 
         // =========================================================================================
@@ -195,6 +251,24 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             };
         }
 
+        /// Sets a column of the matrix.
+        ///
+        /// # Valid Usage
+        ///
+        /// The caller is responsible for ensuring that the column index provided is less
+        /// than the matrix's number of columns.
+        pub inline fn setColumn(self: *Mat, column_index: usize, column: Column) void {
+            assertColumnIndex("setColumn()", column_index);
+
+            switch (layout) {
+                .array_of_columns => self.inner[column_index] = column,
+                .mat2x2_vectorized => {
+                    self.inner[column_index * 2] = column.x();
+                    self.inner[column_index * 2 + 1] = column.y();
+                },
+            }
+        }
+
         /// Returns a row of the matrix.
         ///
         /// # Valid Usage
@@ -212,6 +286,172 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
                 },
                 .mat2x2_vectorized => Row.initXY(self.inner[row_index], self.inner[row_index + 2]),
             }
+        }
+
+        // =========================================================================================
+        // 3D Constructors
+        // =========================================================================================
+
+        /// Creates a new affine transformation from a linear transformation created through
+        /// the `name` function.
+        inline fn linearToAffine(comptime name: []const u8, args: anytype) Mat {
+            const linear = @call(
+                .always_inline,
+                @field(Matrix(rows - 1, columns - 1, T, .optimize), name),
+                args,
+            );
+            return linear.extend().toRepr(repr);
+        }
+
+        /// Creates a new rotation matrix from the provided quaternion.
+        ///
+        /// # Availability
+        ///
+        /// This function is available for 3x3 and 4x4 matrices.
+        pub inline fn fromQuat(quat: Quat) Mat {
+            assertMatrixLinear3D("fromQuat()");
+
+            std.debug.assert(quat.isNormalized(util.toleranceFor(T)));
+
+            if (rows == 3) {
+                // 3D linear
+
+                const x = quat.inner.x();
+                const y = quat.inner.y();
+                const z = quat.inner.z();
+                const w = quat.inner.w();
+
+                const x2 = x + x;
+                const y2 = y + y;
+                const z2 = z + z;
+
+                const xx = x * x2;
+                const xy = x * y2;
+                const xz = x * z2;
+
+                const yy = y * y2;
+                const yz = y * z2;
+
+                const zz = z * z2;
+
+                const wx = w * x2;
+                const wy = w * y2;
+                const wz = w * z2;
+
+                return fromColumnMajorData(.{
+                    1.0 - (yy + zz), xy + wz,         xz - wy,
+                    xy - wz,         1.0 - (xx + zz), yz + wx,
+                    xz + wy,         yz - wx,         1.0 - (xx + yy),
+                });
+            } else {
+                // 3D affine
+
+                return linearToAffine("fromQuat", .{quat.toRepr(.optimize)});
+            }
+        }
+
+        /// Creates a new matrix representing a rotation of `angle` radians around the X axis.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for 3x3 and 4x4 matrices.
+        pub inline fn fromRotationX(angle: T) Mat {
+            assertMatrixLinear3D("fromQuat()");
+
+            if (rows == 3) {
+                const sin = @sin(angle);
+                const cos = @cos(angle);
+
+                return fromColumnMajorData(.{
+                    1.0, 0.0,  0.0,
+                    0.0, cos,  sin,
+                    0.0, -sin, cos,
+                });
+            } else {
+                // 3D affine
+
+                return linearToAffine("fromRotationX", .{angle});
+            }
+        }
+
+        /// Creates a new matrix representing a rotation of `angle` radians around the Y axis.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for 3x3 and 4x4 matrices.
+        pub inline fn fromRotationY(angle: T) Mat {
+            assertMatrixLinear3D("fromQuat()");
+
+            if (rows == 3) {
+                const sin = @sin(angle);
+                const cos = @cos(angle);
+
+                return fromColumnMajorData(.{
+                    cos, 0.0, -sin,
+                    0.0, 1.0, 0.0,
+                    sin, 0.0, cos,
+                });
+            } else {
+                // 3D affine
+
+                return linearToAffine("fromRotationY", .{angle});
+            }
+        }
+
+        /// Creates a new matrix representing a rotation of `angle` radians around the Z axis.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for 3x3 and 4x4 matrices.
+        pub inline fn fromRotationZ(angle: T) Mat {
+            assertMatrixLinear3D("fromQuat()");
+
+            if (rows == 3) {
+                const sin = @sin(angle);
+                const cos = @cos(angle);
+
+                return fromColumnMajorData(.{
+                    cos,  sin, 0.0,
+                    -sin, cos, 0.0,
+                    0.0,  0.0, 1.0,
+                });
+            } else {
+                // 3D affine
+
+                return linearToAffine("fromRotationZ", .{angle});
+            }
+        }
+
+        /// Creates a new translation matrix.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for square matrices of size greater or equal to 1.
+        pub inline fn fromTranslation(translation: Vector(rows - 1, T, repr)) Mat {
+            assertSquare("fromTranslation");
+            var result: Mat = .identity;
+            result.setColumn(columns - 1, translation.extend(zm.oneValue(T)));
+            return result;
+        }
+
+        /// Creates a new translation matrix from the provided X and Y components.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for matrices of size 3x3.
+        pub inline fn fromXY(x: T, y: T) Mat {
+            assertSizeIs("fromXY()", 3, 3);
+            return fromTranslation(.initXY(x, y));
+        }
+
+        /// Creates a new translation matrix from the provided X, Y and Z components.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for matrices of size 4x4.
+        pub inline fn fromXYZ(x: T, y: T, z: T) Mat {
+            assertSizeIs("fromXYZ()", 4, 4);
+            return fromTranslation(.initXYZ(x, y, z));
         }
 
         // =========================================================================================
@@ -370,6 +610,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             std.debug.assert(rows == columns);
         }
 
+        /// Asserts that the provided row index is valid for this matrix type.
         inline fn assertRowIndex(comptime symbol: []const u8, row_index: usize) void {
             if (@inComptime() and row_index >= rows) {
                 const err = std.fmt.comptimePrint("`{s}` can only be used with a row index less than {d}", .{ symbol, rows });
@@ -379,6 +620,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             std.debug.assert(row_index < rows);
         }
 
+        /// Asserts that the provided column index is valid for this matrix type.
         inline fn assertColumnIndex(comptime symbol: []const u8, column_index: usize) void {
             if (@inComptime() and column_index >= columns) {
                 const err = std.fmt.comptimePrint("`{s}` can only be used with a column index less than {d}", .{ symbol, columns });
@@ -386,6 +628,24 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             }
 
             std.debug.assert(column_index < columns);
+        }
+
+        /// Asserts that the matrix is either 3x3 or 4x4.
+        inline fn assertMatrixLinear3D(comptime symbol: []const u8) void {
+            if (@inComptime() and (rows != 3 or columns != 3) and (rows != 4 or columns != 4)) {
+                const err = std.fmt.comptimePrint("`{s}` can only be used with a matrix of size 3x3 or 4x4", .{symbol});
+                @compileError(err);
+            }
+        }
+
+        inline fn assertSizeIs(comptime symbol: []const u8, expected_rows: usize, expected_columns: usize) void {
+            if (@inComptime() and (rows != expected_rows or columns != expected_columns)) {
+                const err = std.fmt.comptimePrint(
+                    "`{s}` can only be used with a matrix of size {d}x{d} (got {d}x{d}",
+                    .{ symbol, expected_rows, expected_columns, rows, columns },
+                );
+                @compileError(err);
+            }
         }
 
         // Implementation detail used by some functions to determine whether a type is a matrix.
@@ -614,6 +874,25 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
                     try std.testing.expectEqual(m1.get(i, j), identity_m1.get(i, j));
                 }
             }
+        }
+
+        test "extend2x2to3x3" {
+            const m = Mat2.fromColumnMajorData(.{
+                util.arbitrary(T, 100), util.arbitrary(T, 100),
+                util.arbitrary(T, 100), util.arbitrary(T, 100),
+            });
+
+            const m2 = m.extend();
+
+            try std.testing.expectEqual(m.get(0, 0), m2.get(0, 0));
+            try std.testing.expectEqual(m.get(0, 1), m2.get(0, 1));
+            try std.testing.expectEqual(zm.zeroValue(T), m2.get(0, 2));
+            try std.testing.expectEqual(m.get(1, 0), m2.get(1, 0));
+            try std.testing.expectEqual(m.get(1, 1), m2.get(1, 1));
+            try std.testing.expectEqual(zm.zeroValue(T), m2.get(1, 2));
+            try std.testing.expectEqual(zm.zeroValue(T), m2.get(2, 0));
+            try std.testing.expectEqual(zm.zeroValue(T), m2.get(2, 1));
+            try std.testing.expectEqual(zm.oneValue(T), m2.get(2, 2));
         }
     };
 }

@@ -51,6 +51,15 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
             return .{ .inner = vec };
         }
 
+        /// Creates a new quaternion with the same representation as the current one.
+        pub inline fn toRepr(self: Quat, new_repr: ReprConfig) Quaternion(T, new_repr) {
+            return .fromVec4(self.inner.toRepr(new_repr));
+        }
+
+        // =========================================================================================
+        // 3D Rotations
+        // =========================================================================================
+
         /// Creates a new quaternion representing a rotation of `angle` radians around the provided
         /// axis.
         ///
@@ -97,6 +106,15 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         pub inline fn fromRotationZ(angle: T) Quat {
             const half = angle * 0.5;
             return init(0.0, 0.0, @sin(half), @cos(half));
+        }
+
+        // =========================================================================================
+        // Predicates
+        // =========================================================================================
+
+        /// Returns whether the quaternion is normalized.
+        pub inline fn isNormalized(self: Quat, tolerance: T) bool {
+            return self.inner.isNormalized(tolerance);
         }
     };
 }

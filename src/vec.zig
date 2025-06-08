@@ -256,6 +256,18 @@ pub fn Vector(
             return result;
         }
 
+        /// Creates a new vector with the same elements as the original vector, but with a
+        /// different representation.
+        pub inline fn toRepr(self: Vec, comptime new_repr: ReprConfig) Vector(dim, T, new_repr) {
+            if (comptime repr.eql(new_repr)) {
+                return self;
+            } else {
+                var result: Vector(dim, T, new_repr) = undefined;
+                for (0..dim) |i| result.set(i, self.get(i));
+                return result;
+            }
+        }
+
         // =========================================================================================
         // Component Access
         // =========================================================================================

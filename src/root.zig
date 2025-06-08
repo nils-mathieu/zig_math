@@ -1,5 +1,9 @@
 const std = @import("std");
 
+// =================================================================================================
+// Support Types
+// =================================================================================================
+
 /// Defines how the elements of a data structure must be laid out in memory.
 ///
 /// # Fundamental Concepts
@@ -106,6 +110,27 @@ pub const ReprConfig = struct {
         .preserve_size = true,
         .preserve_alignment = true,
     };
+
+    /// Returns whether the provided `ReprConfig` is equal to this one.
+    pub inline fn eql(self: ReprConfig, other: ReprConfig) bool {
+        return self.preserve_size == other.preserve_size and
+            self.preserve_alignment == other.preserve_alignment;
+    }
+};
+
+/// Represents the possible handedness of a coordinate system.
+pub const Handedness = enum {
+    /// The coordinate system is right-handed.
+    ///
+    /// This means that if the X axis points to the right and the Y axis points up, then
+    /// the Z axis points out of the screen, toward the viewer.
+    right_handed,
+
+    /// The coordinate system is left-handed.
+    ///
+    /// This means that if the X axis points to the right and the Y axis points up, then
+    /// the Z axis points into the screen, away from the viewer.
+    left_handed,
 };
 
 // =================================================================================================
@@ -144,8 +169,17 @@ pub const Mat4f = Matrix(4, 4, f32, .auto);
 pub const Mat4d = Matrix(4, 4, f64, .auto);
 
 // =================================================================================================
+// Affine
+// =================================================================================================
+
+// =================================================================================================
 // Quaternions
 // =================================================================================================
+
+pub const Quaternion = @import("quat.zig").Quaternion;
+
+pub const Quatf = Quaternion(f32, .auto);
+pub const Quatd = Quaternion(f64, .auto);
 
 // =================================================================================================
 // Constants
@@ -395,6 +429,7 @@ pub fn cast(comptime T: type, val: anytype) T {
 test {
     _ = @import("vec.zig");
     _ = @import("mat.zig");
+    _ = @import("quat.zig");
 }
 
 test isSimdCompatible {
