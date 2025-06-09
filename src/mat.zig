@@ -497,7 +497,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             handedness: Handedness,
         ) Mat {
             assertSizeIs("lookTo()", 4, 4);
-            return Affine(3, T, .optimize).lookTo(eye, dir, up, handedness).toMatWithRepr(repr);
+            return Affine(3, T, .optimize).lookTo(eye.toRepr(.optimize), dir.toRepr(.optimize), up.toRepr(.optimize), handedness).toMatWithRepr(repr);
         }
 
         /// Creates a look-at matrix from the provided parameters.

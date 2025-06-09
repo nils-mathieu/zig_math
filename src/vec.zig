@@ -220,6 +220,19 @@ pub fn Vector(
             return .{ .inner = .{ x_arg, y_arg, z_arg, w_arg } };
         }
 
+        /// Creates a new unit vector pointing in the direction specified by the provided
+        /// angle, measured in radians.
+        ///
+        /// This function is equivalent to treating the 2D vector as a complex number, where
+        /// the X coordinate is the real part, and the Y coordinate the imaginary part.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for 2D vectors.
+        pub inline fn fromAngle(angle: T) Vec {
+            return initXY(@cos(angle), @sin(angle));
+        }
+
         /// Truncates the dimension of the vector to the specified new dimension.
         ///
         /// `new_dim` must be equal or less than the vector's current dimension.
@@ -377,6 +390,11 @@ pub fn Vector(
         ///
         /// This function is only avaialble for types that support SIMD operations.
         pub inline fn toSimd(self: Vec) @Vector(dim, T) {
+            return self.inner;
+        }
+
+        /// Converts the vector to an array.
+        pub inline fn toArray(self: Vec) [dim]T {
             return self.inner;
         }
 

@@ -207,7 +207,7 @@ pub fn Affine(comptime dim: usize, comptime T: type, comptime repr: ReprConfig) 
             std.debug.assert(up.isNormalized(util.toleranceFor(T)));
 
             const f = switch (handedness) {
-                .left_handed => -dir,
+                .left_handed => dir.neg(),
                 .right_handed => dir,
             };
 
@@ -216,9 +216,9 @@ pub fn Affine(comptime dim: usize, comptime T: type, comptime repr: ReprConfig) 
 
             return Aff{
                 .linear = .fromColumnMajorData(.{
-                    s.x, u.x, -f.x,
-                    s.y, u.y, -f.y,
-                    s.z, u.z, -f.z,
+                    s.x(), u.x(), -f.x(),
+                    s.y(), u.y(), -f.y(),
+                    s.z(), u.z(), -f.z(),
                 }),
                 .translation = .initXYZ(-eye.dot(s), -eye.dot(u), eye.dot(f)),
             };
@@ -256,11 +256,11 @@ pub fn Affine(comptime dim: usize, comptime T: type, comptime repr: ReprConfig) 
         /// Converts this affine transformation to a matrix with the specified
         /// representation config.
         pub inline fn toMatWithRepr(self: Aff, comptime new_repr: ReprConfig) Matrix(dim + 1, dim + 1, T, new_repr) {
-            const result: Matrix(dim + 1, dim + 1, T, new_repr) = undefined;
+            var result: Matrix(dim + 1, dim + 1, T, new_repr) = undefined;
             for (0..dim) |i| {
-                result.setColumn(i, self.linear.getColumn(i).extend(zm.zeroValue(T)));
+                result.setColumn(i, self.linear.getColumn(i).extend(zm.zeroValue(T)).toRepr(new_repr));
             }
-            result.setColumn(dim, .unit(dim));
+            result.setColumn(dim, self.translation.extend(zm.oneValue(T)).toRepr(new_repr));
             return result;
         }
 
