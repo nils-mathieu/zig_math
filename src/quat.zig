@@ -116,10 +116,11 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         ///
         /// 1. The rotation of `self` on its own axis by the angle of `other`.
         /// 2. The rotation of `other` by `self` on `self`'s axis.
-        pub inline fn mul(self: Quat, other: Quat) Quat {
+        pub inline fn mulQuat(self: Quat, other: Quat) Quat {
             // https://github.com/bitshifter/glam-rs/blob/600b139ef2c3fb1bb9529cfd4d9c53308c038021/src/f32/coresimd/quat.rs#L769-L801
 
             const Simd = @Vector(4, T);
+            const mask = zm.simd.mask;
 
             const lhs: Simd = self.inner.toSimd();
             const rhs: Simd = other.inner.toSimd();
@@ -134,15 +135,15 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
             const r_wwww: Simd = @splat(lhs[3]);
 
             const lxrw_lyrw_lzrw_lwrw = r_wwww * rhs;
-            const l_wzyx: Simd = @shuffle(T, rhs, undefined, .{ 3, 2, 1, 0 });
+            const l_wzyx = @shuffle(T, rhs, undefined, mask(4, .{ 3, 2, 1, 0 }));
 
             const lwrx_lzrx_lyrx_lxrx = r_xxxx * l_wzyx;
-            const l_zwxy: Simd = @shuffle(T, l_wzyx, undefined, .{ 1, 0, 3, 2 });
+            const l_zwxy = @shuffle(T, l_wzyx, undefined, mask(4, .{ 1, 0, 3, 2 }));
 
             const lwrx_nlzrx_lyrx_nlxrx = lwrx_lzrx_lyrx_lxrx * control_wzyx;
 
             const lzry_lwry_lxry_lyry = r_yyyy * l_zwxy;
-            const l_yxwz: Simd = @shuffle(T, l_zwxy, undefined, .{ 3, 2, 1, 0 });
+            const l_yxwz = @shuffle(T, l_zwxy, undefined, mask(4, .{ 3, 2, 1, 0 }));
 
             const lzry_lwry_nlxry_nlyry = lzry_lwry_lxry_lyry * control_zwxy;
 
@@ -151,7 +152,76 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
 
             const nlyrz_lxrz_lwrz_wlzrz = lyrz_lxrz_lwrz_lzrz * control_yxwz;
             const result1 = lzry_lwry_nlxry_nlyry + nlyrz_lxrz_lwrz_wlzrz;
-            return .{ .inner = .{ .inner = result0 + result1 } };
+            return .{ .inner = .fromSimd(result0 + result1) };
+        }
+
+        /// Multiplies a quaternion by the provided SIMD vector, returning `other` rotated
+        /// by `self`.
+        pub inline fn mulSimd(self: Quat, other: @Vector(3, T)) @Vector(3, T) {
+            // https://github.com/bitshifter/glam-rs/blob/576eafe84af5eca361b0420314381e9923517974/src/f32/coresimd/quat.rs#L828-L839
+
+            const dot = zm.simd.dot;
+            const cross = zm.simd.cross;
+            const splat = zm.simd.splat;
+            const truncate = zm.simd.truncate;
+            const lengthSquared = zm.simd.lengthSquared;
+
+            const lhs = self.inner.toSimd();
+
+            const two = splat(3, @as(f32, 2.0));
+            const w = splat(3, self.inner.w());
+            const b = truncate(T, 4, 3, lhs);
+            const b2 = splat(3, lengthSquared(3, T, b));
+
+            const v1 = w * w - b2;
+            const v2 = b * splat(3, dot(3, T, other, b)) * two;
+            const v3 = cross(T, b, other) * w * two;
+
+            return other * v1 + v2 + v3;
+        }
+
+        /// Multiplies a quaternion by the provided vector, returning `other` rotated by `self`.
+        pub inline fn mulVec(self: Quat, other: Vec3) Vec3 {
+            return .fromSimd(self.mulSimd(other.toSimd()));
+        }
+
+        /// Computes the result of multiplying `Quat` by `Other`.
+        fn Mul(comptime Other: type) type {
+            return switch (Other) {
+                Vec3 => Vec3,
+                Quat => Quat,
+                @Vector(3, T) => @Vector(3, T),
+                else => {
+                    const err = "Only vectors and quaternions can be multiplied";
+                    @compileError(err);
+                },
+            };
+        }
+
+        /// Multiplies this quaternion by the provided value.
+        ///
+        /// # Operands
+        ///
+        /// `other` may be:
+        ///
+        /// - A 3D vector, in which case the result of the operation is the vector rotated by the
+        ///   quaternion.
+        ///
+        /// - Another quaternion, in which case the result of the operation is the product of the two
+        ///   quaternions.
+        ///
+        /// See `mulVec`, `mulQuat`, or `mulSimd` for specialized versions.
+        ///
+        /// # Returns
+        ///
+        /// The resulting type depends on the input operands.
+        pub inline fn mul(self: Quat, other: anytype) Mul(@TypeOf(other)) {
+            return switch (@TypeOf(other)) {
+                Vec3 => self.mulVec(other),
+                Quat => self.mulQuat(other),
+                @Vector(3, T) => self.mulSimd(other),
+                else => @compileError("unreachable"),
+            };
         }
 
         // =========================================================================================
@@ -172,4 +242,38 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
             return fromVec4(self.inner.normalize());
         }
     };
+}
+
+fn includeFixedTests(comptime T: type, comptime repr: ReprConfig) void {
+    const Vec3 = zm.Vector(3, T, repr);
+    const Quat = zm.Quaternion(T, repr);
+
+    _ = struct {
+        test "mulVec" {
+            const a: Vec3 = .initXYZ(1.0, 2.0, 3.0);
+            const rotation = Quat.fromVec4(.initXYZW(0.2, 0.4, 0.1, 0.5));
+            const result = rotation.mulVec(a);
+            try std.testing.expectApproxEqRel(1.56, result.get(0), util.toleranceFor(T));
+            try std.testing.expectApproxEqRel(0.62, result.get(1), util.toleranceFor(T));
+            try std.testing.expectApproxEqRel(0.38, result.get(2), util.toleranceFor(T));
+        }
+
+        test "mulQuat" {
+            const a: Quat = .fromVec4(.initXYZW(0.2, 0.4, 0.1, 0.5));
+            const b: Quat = .fromVec4(.initXYZW(0.3, 0.6, 0.2, 0.7));
+            const result = a.mulQuat(b);
+
+            try std.testing.expectApproxEqRel(0.31, result.inner.get(0), util.toleranceFor(T));
+            try std.testing.expectApproxEqRel(0.57, result.inner.get(1), util.toleranceFor(T));
+            try std.testing.expectApproxEqRel(0.17, result.inner.get(2), util.toleranceFor(T));
+            try std.testing.expectApproxEqRel(0.03, result.inner.get(3), util.toleranceFor(T));
+        }
+    };
+}
+
+test {
+    inline for (util.tested_reprs) |repr| {
+        includeFixedTests(f32, repr);
+        includeFixedTests(f64, repr);
+    }
 }

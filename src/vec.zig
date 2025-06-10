@@ -106,7 +106,7 @@ pub fn Vector(
         },
 
         // =========================================================================================
-        // Constructors and default constants
+        // Default Constants
         // =========================================================================================
 
         /// A vector with all elements set to zero.
@@ -160,6 +160,10 @@ pub fn Vector(
         /// A vector with all elements set to `NaN`.
         pub const nan = splat(std.math.nan(T));
 
+        // =========================================================================================
+        // Constructors
+        // =========================================================================================
+
         /// Creates a new vector with all elements set to the given value.
         pub inline fn splat(value: T) Vec {
             return switch (layout) {
@@ -180,6 +184,16 @@ pub fn Vector(
             return result;
         }
 
+        /// Creates a new vector instance from the provided SIMD vector.
+        pub inline fn fromSimd(simd: @Vector(dim, T)) Vec {
+            return .{ .inner = simd };
+        }
+
+        /// Creates a new vector instance from the provided array.
+        pub inline fn fromArray(array: [dim]T) Vec {
+            return .{ .inner = array };
+        }
+
         /// Creates a new vector with all elements set to the given value.
         ///
         /// # Availability
@@ -187,7 +201,7 @@ pub fn Vector(
         /// This function is only available for vectors of dimension 1.
         pub inline fn initX(x_arg: T) Vec {
             assertDimensionIs("initX()", 1);
-            return .{ .inner = .{x_arg} };
+            return fromArray(.{x_arg});
         }
 
         /// Creates a new vector with the provided X and Y elements.
@@ -197,7 +211,7 @@ pub fn Vector(
         /// This function is only available for vectors of dimension 2.
         pub inline fn initXY(x_arg: T, y_arg: T) Vec {
             assertDimensionIs("initXY()", 2);
-            return .{ .inner = .{ x_arg, y_arg } };
+            return fromArray(.{ x_arg, y_arg });
         }
 
         /// Creates a new vector with the provided X, Y, and Z elements.
@@ -207,7 +221,7 @@ pub fn Vector(
         /// This function is only available for vectors of dimension 3.
         pub inline fn initXYZ(x_arg: T, y_arg: T, z_arg: T) Vec {
             assertDimensionIs("initXYZ()", 3);
-            return .{ .inner = .{ x_arg, y_arg, z_arg } };
+            return fromArray(.{ x_arg, y_arg, z_arg });
         }
 
         /// Creates a new vector with the provided X, Y, Z, and W elements.
@@ -217,7 +231,7 @@ pub fn Vector(
         /// This function is only available for vectors of dimension 4.
         pub inline fn initXYZW(x_arg: T, y_arg: T, z_arg: T, w_arg: T) Vec {
             assertDimensionIs("initXYZW()", 4);
-            return .{ .inner = .{ x_arg, y_arg, z_arg, w_arg } };
+            return fromArray(.{ x_arg, y_arg, z_arg, w_arg });
         }
 
         /// Creates a new unit vector pointing in the direction specified by the provided
@@ -243,6 +257,14 @@ pub fn Vector(
         pub inline fn truncateTo(self: Vec, comptime new_dim: usize) Vector(new_dim, T, repr) {
             assertDimensionIsAtLeast("truncateTo()", new_dim);
             const Result = Vector(new_dim, T, repr);
+
+            if (layout == .simd and Result.layout == .simd) {
+                // Use @shuffle when the output is a SIMD vector too.
+                comptime var mask: @Vector(i32, new_dim) = undefined;
+                for (0..new_dim) |i| mask[i] = @intCast(i);
+                return .fromSimd(@shuffle(T, self.inner, undefined, mask));
+            }
+
             var result: Result = undefined;
             for (0..new_dim) |i| result.set(i, self.get(i));
             return result;
@@ -433,19 +455,23 @@ pub fn Vector(
 
                 const lhs: @Vector(dim, T) = self.inner;
 
-                const rhs: @Vector(dim, T) = switch (Rhs) {
-                    Vec => other.inner,
-                    T => @splat(other),
+                const rhs = blk: switch (Rhs) {
+                    Vec => break :blk other.inner,
+                    T => break :blk @as(@Vector(dim, T), @splat(other)),
                     @Vector(dim, T) => other,
                     else => {
-                        const err = std.fmt.comptimePrint("Unsupported type for `{s}` operation: {}", .{ operation, @typeName(Rhs) });
+                        if (zm.isFloat(T) and Rhs == comptime_float) {
+                            break :blk @as(@Vector(dim, T), @splat(@as(T, other)));
+                        } else if (zm.isInt(T) and Rhs == comptime_int) {
+                            break :blk @as(@Vector(dim, T), @splat(@as(T, other)));
+                        }
+
+                        const err = std.fmt.comptimePrint("Unsupported type for `{s}` operation: {s}", .{ operation, @typeName(Rhs) });
                         @compileError(err);
                     },
                 };
 
-                // If `inner` is a SIMD vector, this will just move it in there. Otherwise, this
-                // will cast the SIMD vector to an array.
-                return Vec{ .inner = Context.invokeOnVector(lhs, rhs) };
+                return .{ .inner = Context.invokeOnVector(lhs, rhs) };
             } else {
                 // `T` cannot be moved into a SIMD vector. We have to manually iterate
                 // over the vector's array.
@@ -1038,6 +1064,37 @@ pub fn Vector(
             return invokeUnaryOperation(Context, Abs, self);
         }
 
+        /// Rotates the vector around the Z axis.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for 2D vectors.
+        pub inline fn rotateAngle(self: Vec, angle: f32) Vec {
+            return self.rotate(.fromAngle(angle));
+        }
+
+        /// Computes the rotation of this vectorby `other`, where other is a rotation created
+        /// through the `fromAngle` function.
+        ///
+        /// # Remarks
+        ///
+        /// If `other` is not of unit length, then the resulting vector will have its length
+        /// multiplied by that of `other`.
+        ///
+        /// This function is equivalent to multiplying the two vectors using complex
+        /// multiplication, where the X component of each vector stores the real part, and the
+        /// the Y component of each vector stores the immaginary part.
+        ///
+        /// # Availability
+        ///
+        /// This function is only available for 2D vectors.
+        pub inline fn rotate(self: Vec, other: Vec) Vec {
+            return initXY(
+                self.x() * other.x() - self.y() * other.y(),
+                self.y() * other.x() + self.x() * other.y(),
+            );
+        }
+
         // =========================================================================================
         // Reduction Operations
         // =========================================================================================
@@ -1260,24 +1317,7 @@ pub fn Vector(
         /// The cross-product is only defined for vectors of dimension 3.
         pub inline fn cross(self: Vec, other: Vec) Vec {
             assertDimensionIs("cross()", 3);
-
-            switch (layout) {
-                .array => {
-                    return initXYZ(
-                        self.y() * other.z() - other.y() * self.z(),
-                        self.z() * other.x() - other.z() * self.x(),
-                        self.x() * other.y() - other.x() * self.y(),
-                    );
-                },
-                .simd => {
-                    const a = @shuffle(T, self.inner, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 }));
-                    const b = @shuffle(T, other.inner, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 }));
-                    const ab = a * other.inner;
-                    const ba = b * self.inner;
-                    const s = ab - ba;
-                    return .{ .inner = @shuffle(T, s, undefined, @as(@Vector(3, i32), .{ 2, 0, 1 })) };
-                },
-            }
+            return .{ .inner = zm.simd.cross(T, self.toSimd(), other.toSimd()) };
         }
 
         /// Computes the vector projection of `self` onto `other`.
@@ -1484,6 +1524,22 @@ pub fn Vector(
             }
 
             std.debug.assert(dim >= minimum_dim);
+        }
+
+        // =========================================================================================
+        // Other
+        // =========================================================================================
+
+        /// Formats the vector to the provided writer.
+        pub fn format(self: Vec, comptime fmt: []const u8, opts: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = opts;
+
+            try writer.writeByte('[');
+            for (0..dim) |i| {
+                if (i > 0) try writer.writeAll(", ");
+                try std.fmt.formatType(self.get(i), fmt, .{}, writer, std.options.fmt_max_depth);
+            }
+            try writer.writeByte(']');
         }
 
         // Implementation detail used by some functions to determine whether a type is a vector.

@@ -1,5 +1,7 @@
 const std = @import("std");
 
+pub const simd = @import("simd.zig");
+
 // =================================================================================================
 // Support Types
 // =================================================================================================
@@ -483,6 +485,7 @@ test {
     _ = @import("mat.zig");
     _ = @import("quat.zig");
     _ = @import("aff.zig");
+    _ = @import("simd.zig");
 }
 
 test isSimdCompatible {
