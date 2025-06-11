@@ -1,5 +1,5 @@
 .{
-    .name = .zm,
+    .name = .zig_math,
     .fingerprint = 0xa70a9e66d7a235aa,
     .version = "0.0.1",
     .paths = .{

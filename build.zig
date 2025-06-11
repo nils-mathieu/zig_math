@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
     // Main module
     // =============================================================================================
 
-    _ = b.addModule("zm", .{ .root_source_file = b.path("src/root.zig") });
+    _ = b.addModule("zig_math", .{ .root_source_file = b.path("src/root.zig") });
 
     // =============================================================================================
     // Native Tests
