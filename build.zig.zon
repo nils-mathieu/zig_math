@@ -1,6 +1,6 @@
 .{
     .name = .zig_math,
-    .fingerprint = 0xa70a9e66d7a235aa,
+    .fingerprint = 0x614de7ae771f9041,
     .version = "0.0.1",
     .paths = .{
         "build.zig",
