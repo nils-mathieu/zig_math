@@ -37,6 +37,10 @@ enum, making it suitable for various graphics APIs and mathematical conventions.
 
 Add zm as a dependency in your `build.zig.zon`:
 
+```sh
+zig fetch --save git+https://github.com/nils-mathieu/zig_math
+```
+
 ```zig
 .{
     .name = "your-project",
