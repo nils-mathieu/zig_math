@@ -25,7 +25,7 @@ pub fn printFunction(allocator: std.mem.Allocator, writer: anytype, swizzles: []
         \\        /// in another order.
         \\        ///
         \\        /// You can use the `swizzle` function for more complex swizzle operations.
-        \\        pub inline fn {[fn_name]s}(self: *const @This()) Vector({[out_dim]}, T, repr) {{
+        \\        pub fn {[fn_name]s}(self: *const @This()) Vector({[out_dim]}, T, repr) {{
         \\            const v: *const Vec = @alignCast(@fieldParentPtr("swizzles", self));
         \\            assertDimensionIsAtLeast("swizzles.{[fn_name]s}()", {[required_dim]});
         \\            return v.swizzle({[out_dim]}, .{{ {[text_indices]s} }});
@@ -72,7 +72,7 @@ pub fn main() !void {
         \\    const Vec = Vector(dim, T, repr);
         \\
         \\    return struct {
-        \\        inline fn assertDimensionIsAtLeast(comptime symbol: []const u8, minimum_dim: usize) void {
+        \\        fn assertDimensionIsAtLeast(comptime symbol: []const u8, minimum_dim: usize) void {
         \\            if (@inComptime() and dim < minimum_dim) {
         \\                const err = std.fmt.comptimePrint("`{s}` expects a vector of dimension at least {}, got {}", .{ symbol, minimum_dim, dim });
         \\                @compileError(err);

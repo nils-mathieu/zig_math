@@ -1,7 +1,7 @@
-const zm = @import("root.zig");
 const std = @import("std");
-const util = @import("util.zig");
 
+const util = @import("util.zig");
+const zm = @import("root.zig");
 const ReprConfig = zm.ReprConfig;
 const Vector = zm.Vector;
 const Quaternion = zm.Quaternion;
@@ -115,7 +115,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         };
 
         /// Creates a new matrix with all elements initialized to the given value.
-        pub inline fn splat(value: T) Mat {
+        pub fn splat(value: T) Mat {
             return switch (layout) {
                 .array_of_columns => Mat{ .inner = [1]Column{Column.splat(value)} ** columns },
                 .mat2x2_vectorized => Mat{ .inner = @Vector(4, T){ value, value, value, value } },
@@ -123,7 +123,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         /// Creates a new matrix from the provided column-major data.
-        pub inline fn fromColumnMajorData(data: [columns * rows]T) Mat {
+        pub fn fromColumnMajorData(data: [columns * rows]T) Mat {
             switch (layout) {
                 .array_of_columns => {
                     if (@bitSizeOf([columns * rows]T) == @bitSizeOf([columns]Column)) {
@@ -143,7 +143,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         /// Creates a new matrix from the provided columns.
-        pub inline fn fromColumns(data: [columns]Column) Mat {
+        pub fn fromColumns(data: [columns]Column) Mat {
             switch (layout) {
                 .array_of_columns => return Mat{ .inner = data },
                 .mat2x2_vectorized => return Mat{ .inner = data[0].inner ++ data[1].inner },
@@ -156,7 +156,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
 
         /// Creates a new matrix with the same data as this one, but with a different
         /// representation configuration.
-        pub inline fn toRepr(self: Mat, comptime new_repr: ReprConfig) Matrix(rows, columns, T, new_repr) {
+        pub fn toRepr(self: Mat, comptime new_repr: ReprConfig) Matrix(rows, columns, T, new_repr) {
             if (comptime new_repr.eql(repr)) return self;
 
             var result: Matrix(rows, columns, T, new_repr) = undefined;
@@ -172,7 +172,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available for square matrices.
-        pub inline fn extend(self: Mat) Matrix(rows + 1, columns + 1, T, repr) {
+        pub fn extend(self: Mat) Matrix(rows + 1, columns + 1, T, repr) {
             assertSquare("extend()");
 
             const NewMat = Matrix(rows + 1, columns + 1, T, repr);
@@ -213,7 +213,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         ///
         /// The caller is responsible for ensuring that the row and column indices provided are
         /// within the bounds of the matrix.
-        pub inline fn get(self: Mat, row_index: usize, column_index: usize) T {
+        pub fn get(self: Mat, row_index: usize, column_index: usize) T {
             assertRowIndex("get()", row_index);
             assertColumnIndex("get()", column_index);
 
@@ -229,7 +229,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         ///
         /// The caller is responsible for ensuring that the row and column indices provided are
         /// within the bounds of the matrix.
-        pub inline fn set(self: *Mat, row_index: usize, column_index: usize, value: T) void {
+        pub fn set(self: *Mat, row_index: usize, column_index: usize, value: T) void {
             assertRowIndex("set()", row_index);
             assertColumnIndex("set()", column_index);
 
@@ -245,7 +245,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         ///
         /// The caller is responsible for ensuring that the column index provided is less
         /// than the matrix's number of columns.
-        pub inline fn getColumn(self: Mat, column_index: usize) Column {
+        pub fn getColumn(self: Mat, column_index: usize) Column {
             assertColumnIndex("getColumn()", column_index);
 
             return switch (layout) {
@@ -260,7 +260,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         ///
         /// The caller is responsible for ensuring that the column index provided is less
         /// than the matrix's number of columns.
-        pub inline fn setColumn(self: *Mat, column_index: usize, column: Column) void {
+        pub fn setColumn(self: *Mat, column_index: usize, column: Column) void {
             assertColumnIndex("setColumn()", column_index);
 
             switch (layout) {
@@ -278,7 +278,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         ///
         /// The caller is responsible for ensuring that the row index provided is less
         /// than the matrix's number of rows.
-        pub inline fn getRow(self: Mat, row_index: usize) Row {
+        pub fn getRow(self: Mat, row_index: usize) Row {
             assertRowIndex("getRow()", row_index);
 
             switch (layout) {
@@ -300,7 +300,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is available for 3x3 and 4x4 matrices.
-        pub inline fn fromQuat(quat: Quat) Mat {
+        pub fn fromQuat(quat: Quat) Mat {
             assertMatrixLinear3D("fromQuat()");
 
             std.debug.assert(quat.isNormalized(util.toleranceFor(T)));
@@ -358,7 +358,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available for 3x3 and 4x4 matrices.
-        pub inline fn fromRotationX(angle: T) Mat {
+        pub fn fromRotationX(angle: T) Mat {
             assertMatrixLinear3D("fromQuat()");
 
             const sin = @sin(angle);
@@ -385,7 +385,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available for 3x3 and 4x4 matrices.
-        pub inline fn fromRotationY(angle: T) Mat {
+        pub fn fromRotationY(angle: T) Mat {
             assertMatrixLinear3D("fromQuat()");
 
             const sin = @sin(angle);
@@ -412,7 +412,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available for 2x2, 3x3 and 4x4 matrices.
-        pub inline fn fromRotationZ(angle: T) Mat {
+        pub fn fromRotationZ(angle: T) Mat {
             assertMatrixLinear2D("fromQuat()");
 
             const sin = @sin(angle);
@@ -443,7 +443,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available for square matrices of size greater or equal to 1.
-        pub inline fn fromTranslation(translation: Vector(rows - 1, T, repr)) Mat {
+        pub fn fromTranslation(translation: Vector(rows - 1, T, repr)) Mat {
             assertSquare("fromTranslation");
             var result: Mat = .identity;
             result.setColumn(columns - 1, translation.extend(zm.oneValue(T)));
@@ -455,7 +455,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available for matrices of size 3x3.
-        pub inline fn fromXY(x: T, y: T) Mat {
+        pub fn fromXY(x: T, y: T) Mat {
             assertSizeIs("fromXY()", 3, 3);
             return fromTranslation(.initXY(x, y));
         }
@@ -465,7 +465,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available for matrices of size 4x4.
-        pub inline fn fromXYZ(x: T, y: T, z: T) Mat {
+        pub fn fromXYZ(x: T, y: T, z: T) Mat {
             assertSizeIs("fromXYZ()", 4, 4);
             return fromTranslation(.initXYZ(x, y, z));
         }
@@ -490,7 +490,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available for 4x4 matrices.
-        pub inline fn lookTo(
+        pub fn lookTo(
             eye: Vec3,
             dir: Vec3,
             up: Vec3,
@@ -516,7 +516,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available for 4x4 matrices.
-        pub inline fn lookAt(
+        pub fn lookAt(
             eye: Vec3,
             center: Vec3,
             up: Vec3,
@@ -557,7 +557,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Availability
         ///
         /// This function is only available with 4x4 matrices.
-        pub inline fn perspective(
+        pub fn perspective(
             scale_x: T,
             scale_y: T,
             z_near: ?T,
@@ -571,8 +571,8 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             std.debug.assert(z_near != null or z_far != null);
 
             const e = switch (handedness) {
-                .left_handed => 1.0,
-                .right_handed => -1.0,
+                .left_handed => @as(T, 1.0),
+                .right_handed => @as(T, -1.0),
             };
 
             const scale_z =
@@ -619,7 +619,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         ///
         /// This function returns a right-handed perspective matrix that maps the source space's
         /// depth to the range [-1, 1], as OpenGL normally expects.
-        pub inline fn perspectiveGl(fov_y: T, aspect_ratio: T, z_near: T, z_far: T) Mat {
+        pub fn perspectiveGl(fov_y: T, aspect_ratio: T, z_near: T, z_far: T) Mat {
             const half_fov = fov_y * 0.5;
             const scale_y = @cos(half_fov) / @sin(half_fov); // 1.0 / tan(half_fov)
             const scale_x = scale_y / aspect_ratio;
@@ -631,7 +631,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         // =========================================================================================
 
         /// Multiplies this matrix by the provided scalar.
-        pub inline fn mulScalar(self: Mat, other: T) Mat {
+        pub fn mulScalar(self: Mat, other: T) Mat {
             switch (layout) {
                 .array_of_columns => {
                     var result: Mat = self;
@@ -649,7 +649,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Returns
         ///
         /// The resulting vector, which will have the same number of columns as this matrix.
-        pub inline fn mulVector(self: Mat, other: Vector(rows, T, repr)) Vector(columns, T, repr) {
+        pub fn mulVector(self: Mat, other: Vector(rows, T, repr)) Vector(columns, T, repr) {
             // Optimization for 2x2 matrices.
             if (layout == .mat2x2_vectorized) {
                 // https://github.com/bitshifter/glam-rs/blob/600b139ef2c3fb1bb9529cfd4d9c53308c038021/src/f32/coresimd/mat2.rs#L296-L303
@@ -672,13 +672,13 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         ///
         /// The resulting matrix, which will have the same number of rows as this matrix, and the
         /// same number of columns as the other matrix.
-        pub inline fn mulMatrix(
+        pub fn mulMatrix(
             self: Mat,
             comptime other_columns: usize,
             other: Matrix(columns, other_columns, T, repr),
         ) Matrix(rows, other_columns, T, repr) {
             // Optimization for 2x2 matrices.
-            if (layout == .mat2x2_vectorized and
+            if (comptime layout == .mat2x2_vectorized and
                 Matrix(rows, other_columns, T, repr).layout == .mat2x2_vectorized and
                 Matrix(columns, other_columns, T, repr).layout == .mat2x2_vectorized)
             {
@@ -754,14 +754,14 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         /// # Result
         ///
         /// The return type of the function depends on the second operand's type.
-        pub inline fn mul(self: Mat, other: anytype) Mul(@TypeOf(other)) {
+        pub fn mul(self: Mat, other: anytype) Mul(@TypeOf(other)) {
             const Other = @TypeOf(other);
 
-            if (zm.isMatrix(Other)) {
+            if (comptime zm.isMatrix(Other)) {
                 return mulMatrix(self, Other.columns, other);
-            } else if (zm.isVector(Other)) {
+            } else if (comptime zm.isVector(Other)) {
                 return mulVector(self, other);
-            } else if (Other == T) {
+            } else if (comptime Other == T) {
                 return mulScalar(self, other);
             } else {
                 @compileError("unreachable");
@@ -773,7 +773,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         // =========================================================================================
 
         /// Asserts that the matrix is square.
-        inline fn assertSquare(comptime symbol: []const u8) void {
+        fn assertSquare(comptime symbol: []const u8) void {
             if (@inComptime() and rows != columns) {
                 const err = std.fmt.comptimePrint("`{s}` can only be used with a square matrix", .{symbol});
                 @compileError(err);
@@ -783,7 +783,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         /// Asserts that the provided row index is valid for this matrix type.
-        inline fn assertRowIndex(comptime symbol: []const u8, row_index: usize) void {
+        fn assertRowIndex(comptime symbol: []const u8, row_index: usize) void {
             if (@inComptime() and row_index >= rows) {
                 const err = std.fmt.comptimePrint("`{s}` can only be used with a row index less than {d}", .{ symbol, rows });
                 @compileError(err);
@@ -793,7 +793,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         /// Asserts that the provided column index is valid for this matrix type.
-        inline fn assertColumnIndex(comptime symbol: []const u8, column_index: usize) void {
+        fn assertColumnIndex(comptime symbol: []const u8, column_index: usize) void {
             if (@inComptime() and column_index >= columns) {
                 const err = std.fmt.comptimePrint("`{s}` can only be used with a column index less than {d}", .{ symbol, columns });
                 @compileError(err);
@@ -803,7 +803,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         /// Asserts that the matrix is either 3x3 or 4x4.
-        inline fn assertMatrixLinear3D(comptime symbol: []const u8) void {
+        fn assertMatrixLinear3D(comptime symbol: []const u8) void {
             if (@inComptime() and (rows != 3 or columns != 3) and (rows != 4 or columns != 4)) {
                 const err = std.fmt.comptimePrint("`{s}` can only be used with a matrix of size 3x3 or 4x4", .{symbol});
                 @compileError(err);
@@ -811,14 +811,14 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         /// Asserts that the matrix is either 2x2, 3x3 or 4x4.
-        inline fn assertMatrixLinear2D(comptime symbol: []const u8) void {
+        fn assertMatrixLinear2D(comptime symbol: []const u8) void {
             if (@inComptime() and (rows != 2 or columns != 2) and (rows != 3 or columns != 3) and (rows != 4 or columns != 4)) {
                 const err = std.fmt.comptimePrint("`{s}` can only be used with a matrix of size 2x2, 3x3 or 4x4", .{symbol});
                 @compileError(err);
             }
         }
 
-        inline fn assertSizeIs(comptime symbol: []const u8, expected_rows: usize, expected_columns: usize) void {
+        fn assertSizeIs(comptime symbol: []const u8, expected_rows: usize, expected_columns: usize) void {
             if (@inComptime() and (rows != expected_rows or columns != expected_columns)) {
                 const err = std.fmt.comptimePrint(
                     "`{s}` can only be used with a matrix of size {d}x{d} (got {d}x{d}",
@@ -874,7 +874,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         test nan {
-            if (!zm.isFloat(T)) return;
+            if (comptime !zm.isFloat(T)) return;
             var m = Mat.nan;
             for (0..rows) |i| {
                 for (0..columns) |j| {
@@ -884,7 +884,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         test identity {
-            if (rows != columns) return;
+            if (comptime rows != columns) return;
 
             var m = Mat.identity;
             for (0..rows) |i| {
@@ -899,7 +899,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         test mulScalar {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
 
             const m = util.arbitrary(Mat, 10);
             const s = util.arbitrary(T, 10);
@@ -927,7 +927,7 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
         }
 
         test "mulMatrix2x2" {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
 
             const m1 = Mat2.fromColumnMajorData(.{
                 t(1), t(2),
@@ -939,7 +939,7 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
             });
             const result = m1.mul(m2);
 
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 try std.testing.expectApproxEqAbs(23.0, result.get(0, 0), util.toleranceFor(T));
                 try std.testing.expectApproxEqAbs(31.0, result.get(0, 1), util.toleranceFor(T));
                 try std.testing.expectApproxEqAbs(34.0, result.get(1, 0), util.toleranceFor(T));
@@ -963,7 +963,7 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
         }
 
         test "mulMatrix3x3" {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
 
             const m1 = Mat3.fromColumnMajorData(.{
                 t(1), t(4), t(7),
@@ -978,7 +978,7 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
 
             const result = m1.mul(m2);
 
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 try std.testing.expectApproxEqAbs(36.0, result.get(0, 0), util.toleranceFor(T));
                 try std.testing.expectApproxEqAbs(42.0, result.get(0, 1), util.toleranceFor(T));
                 try std.testing.expectApproxEqAbs(48.0, result.get(0, 2), util.toleranceFor(T));
@@ -1012,7 +1012,7 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
         }
 
         test "mulMatrix4x4" {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
 
             const m1 = Mat4.fromColumnMajorData(.{
                 t(1), t(3), t(5), t(7),
@@ -1029,7 +1029,7 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
 
             const result = m1.mul(m2);
 
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 try std.testing.expectApproxEqRel(12.0, result.get(0, 0), util.toleranceFor(T));
                 try std.testing.expectApproxEqRel(18.0, result.get(0, 1), util.toleranceFor(T));
                 try std.testing.expectApproxEqRel(24.0, result.get(0, 2), util.toleranceFor(T));
@@ -1096,7 +1096,7 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
         }
 
         test "perspectiveGl" {
-            if (!zm.isFloat(T)) return;
+            if (comptime !zm.isFloat(T)) return;
 
             const m = Mat4.perspectiveGl(std.math.degreesToRadians(45.0), 2.0, 1.0, 10.0);
 

@@ -2,6 +2,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+
 const zm = @import("root.zig");
 
 // =================================================================================================
@@ -40,7 +41,7 @@ pub fn arbitrary(comptime T: type, amplitude: comptime_int) T {
             }
         },
         .float => {
-            if (T == f32 or T == f64) {
+            if (comptime T == f32 or T == f64) {
                 const x = rng().float(T) * 2.0 - 1.0;
                 return x * @as(T, @floatFromInt(amplitude));
             }
@@ -60,13 +61,13 @@ pub fn arbitrary(comptime T: type, amplitude: comptime_int) T {
         },
         .bool => return rng().boolean(),
         .@"struct" => {
-            if (zm.isVector(T)) {
+            if (comptime zm.isVector(T)) {
                 var result: T = undefined;
                 for (0..T.dimension) |i| result.set(i, arbitrary(T.Element, amplitude));
                 return result;
             }
 
-            if (zm.isMatrix(T)) {
+            if (comptime zm.isMatrix(T)) {
                 var result: T = undefined;
                 for (0..T.rows) |i| {
                     for (0..T.columns) |j| {
@@ -87,7 +88,7 @@ pub fn arbitrary(comptime T: type, amplitude: comptime_int) T {
 }
 
 /// Returns the tolerance value that should be used with the provided type.
-pub fn toleranceFor(comptime T: type) comptime_float {
+pub fn toleranceFor(comptime T: type) T {
     return switch (T) {
         f16 => 1e-1,
         f32 => 1e-4,

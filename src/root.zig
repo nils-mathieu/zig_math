@@ -1,6 +1,10 @@
 const std = @import("std");
 
+pub const Affine = @import("aff.zig").Affine;
+pub const Matrix = @import("mat.zig").Matrix;
+pub const Quaternion = @import("quat.zig").Quaternion;
 pub const simd = @import("simd.zig");
+pub const Vector = @import("vec.zig").Vector;
 
 // =================================================================================================
 // Support Types
@@ -114,7 +118,7 @@ pub const ReprConfig = struct {
     };
 
     /// Returns whether the provided `ReprConfig` is equal to this one.
-    pub inline fn eql(self: ReprConfig, other: ReprConfig) bool {
+    pub fn eql(self: ReprConfig, other: ReprConfig) bool {
         return self.preserve_size == other.preserve_size and
             self.preserve_alignment == other.preserve_alignment;
     }
@@ -184,8 +188,6 @@ pub const EulerOrder = enum {
 // Vectors
 // =================================================================================================
 
-pub const Vector = @import("vec.zig").Vector;
-
 pub const Vec2f = Vector(2, f32, .auto);
 pub const Vec2d = Vector(2, f64, .auto);
 pub const Vec2i = Vector(2, i32, .auto);
@@ -206,8 +208,6 @@ pub const Vec4b = Vector(4, bool, .auto);
 // Matrices
 // =================================================================================================
 
-pub const Matrix = @import("mat.zig").Matrix;
-
 pub const Mat2f = Matrix(2, 2, f32, .auto);
 pub const Mat2d = Matrix(2, 2, f64, .auto);
 pub const Mat3f = Matrix(3, 3, f32, .auto);
@@ -219,8 +219,6 @@ pub const Mat4d = Matrix(4, 4, f64, .auto);
 // Affine
 // =================================================================================================
 
-pub const Affine = @import("aff.zig").Affine;
-
 pub const Aff2f = Affine(2, f32, .auto);
 pub const Aff2d = Affine(2, f64, .auto);
 pub const Aff3f = Affine(3, f32, .auto);
@@ -229,8 +227,6 @@ pub const Aff3d = Affine(3, f64, .auto);
 // =================================================================================================
 // Quaternions
 // =================================================================================================
-
-pub const Quaternion = @import("quat.zig").Quaternion;
 
 pub const Quatf = Quaternion(f32, .auto);
 pub const Quatd = Quaternion(f64, .auto);
@@ -251,7 +247,7 @@ pub const Quatd = Quaternion(f64, .auto);
 ///
 /// This function supports **vector** types, which are filled with the additive identity
 /// of their child element type using `zeroValue`.
-pub inline fn zeroValue(comptime T: type) T {
+pub fn zeroValue(comptime T: type) T {
     return switch (@typeInfo(T)) {
         .int => 0,
         .float => 0.0,
@@ -273,7 +269,7 @@ pub inline fn zeroValue(comptime T: type) T {
 ///
 /// This function supports **vector** types, which are filled with the multiplicative identity
 /// of their child element type using `oneValue`.
-pub inline fn oneValue(comptime T: type) T {
+pub fn oneValue(comptime T: type) T {
     return switch (@typeInfo(T)) {
         .int => 1,
         .float => 1.0,
@@ -295,7 +291,7 @@ pub inline fn oneValue(comptime T: type) T {
 ///
 /// This function supports **vector** types, which are filled with the maximum value
 /// of their child element type using `maxValue`.
-pub inline fn maxValue(comptime T: type) T {
+pub fn maxValue(comptime T: type) T {
     return switch (@typeInfo(T)) {
         .int => std.math.maxInt(T),
         .float => std.math.inf(T),
@@ -317,7 +313,7 @@ pub inline fn maxValue(comptime T: type) T {
 ///
 /// This function supports **vector** types, which are filled with the minimum value
 /// of their child element type using `minValue`.
-pub inline fn minValue(comptime T: type) T {
+pub fn minValue(comptime T: type) T {
     return switch (@typeInfo(T)) {
         .int => std.math.minInt(T),
         .float => -std.math.inf(T),
@@ -346,7 +342,7 @@ pub inline fn minValue(comptime T: type) T {
 /// # Returns
 ///
 /// A boolean indicating whether the type is SIMD-compatible.
-pub inline fn isSimdCompatible(comptime T: type) bool {
+pub fn isSimdCompatible(comptime T: type) bool {
     switch (@typeInfo(T)) {
         .bool, .int, .float => return true,
         .pointer => |info| return info.size != .slice,
@@ -364,7 +360,7 @@ pub inline fn isSimdCompatible(comptime T: type) bool {
 /// Returns whether the type `T` is a floating-point type.
 ///
 /// Note that `comptime_float` is also considered a floating-point type.
-pub inline fn isFloat(comptime T: type) bool {
+pub fn isFloat(comptime T: type) bool {
     const info = @typeInfo(T);
     return info == .float or info == .comptime_float;
 }
@@ -372,13 +368,13 @@ pub inline fn isFloat(comptime T: type) bool {
 /// Returns whether the type `T` is an integer type.
 ///
 /// Note that `comptime_int` is also considered an integer type.
-pub inline fn isInt(comptime T: type) bool {
+pub fn isInt(comptime T: type) bool {
     const info = @typeInfo(T);
     return info == .int or info == .comptime_int;
 }
 
 /// Returns whether the type `T` is an unsigned integer type.
-pub inline fn isUnsignedInt(comptime T: type) bool {
+pub fn isUnsignedInt(comptime T: type) bool {
     const info = @typeInfo(T);
     return info == .int and info.int.signedness == .unsigned;
 }
@@ -386,7 +382,7 @@ pub inline fn isUnsignedInt(comptime T: type) bool {
 /// Returns whether the type `T` is a signed integer type.
 ///
 /// Note that `comptime_int` is also considered a signed integer type.
-pub inline fn isSignedInt(comptime T: type) bool {
+pub fn isSignedInt(comptime T: type) bool {
     const info = @typeInfo(T);
     if (info == .comptime_int) return true;
     return info == .int and info.int.signedness == .signed;
@@ -395,7 +391,7 @@ pub inline fn isSignedInt(comptime T: type) bool {
 /// Returns whether the type `T` is a number type.
 ///
 /// Number types include integers, floats, `comptime_int`, and `comptime_float`.
-pub inline fn isNumber(comptime T: type) bool {
+pub fn isNumber(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .int, .float, .comptime_int, .comptime_float => true,
         else => false,
@@ -405,7 +401,7 @@ pub inline fn isNumber(comptime T: type) bool {
 /// Returns whether the type `T` is a signed number type.
 ///
 /// Signed number types include signed integers, floats, `comptime_int`, and `comptime_float`.
-pub inline fn isSigned(comptime T: type) bool {
+pub fn isSigned(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .int => |info| info.signedness == .signed,
         .float, .comptime_float, .comptime_int => true,
@@ -414,7 +410,7 @@ pub inline fn isSigned(comptime T: type) bool {
 }
 
 /// Returns whether the given type is a vector type created with the `Vector` generic function.
-pub inline fn isVector(comptime T: type) bool {
+pub fn isVector(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .@"struct", .@"union", .@"enum", .@"opaque" => @hasDecl(T, "__zm_private_is_vector"),
         else => false,
@@ -422,7 +418,7 @@ pub inline fn isVector(comptime T: type) bool {
 }
 
 /// Returns whether the given type is a matrix type created with the `Matrix` generic function.
-pub inline fn isMatrix(comptime T: type) bool {
+pub fn isMatrix(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .@"struct", .@"union", .@"enum", .@"opaque" => @hasDecl(T, "__zm_private_is_matrix"),
         else => false,
@@ -455,25 +451,23 @@ pub inline fn isMatrix(comptime T: type) bool {
 /// conversion is not possible.
 pub fn cast(comptime T: type, val: anytype) T {
     const S = @TypeOf(val);
+    const err = "Can't convert `" ++ @typeName(S) ++ "` to `" ++ @typeName(T) ++ "`";
 
     switch (@typeInfo(T)) {
         .int, .comptime_int => switch (@typeInfo(S)) {
             .int, .comptime_int => return @intCast(val),
             .float, .comptime_float => return @intFromFloat(val),
             .bool => return @intFromBool(val),
-            else => {},
+            else => @compileError(err),
         },
         .float, .comptime_float => switch (@typeInfo(S)) {
             .int, .comptime_int => return @floatFromInt(val),
             .float, .comptime_float => return @floatCast(val),
             .bool => return @floatFromInt(@intFromBool(val)),
-            else => {},
+            else => @compileError(err),
         },
-        else => {},
+        else => @compileError(err),
     }
-
-    const err = "Can't convert `" ++ @typeName(S) ++ "` to `" ++ @typeName(T) ++ "`";
-    @compileError(err);
 }
 
 // =================================================================================================

@@ -1,9 +1,9 @@
 const std = @import("std");
-const zm = @import("root.zig");
-const util = @import("util.zig");
 
-const ReprConfig = zm.ReprConfig;
 const VectorSwizzles = @import("gen/vector_swizzles.zig").VectorSwizzles;
+const util = @import("util.zig");
+const zm = @import("root.zig");
+const ReprConfig = zm.ReprConfig;
 
 /// A possible layout selected to represent a vector.
 const VectorLayout = enum {
@@ -165,7 +165,7 @@ pub fn Vector(
         // =========================================================================================
 
         /// Creates a new vector with all elements set to the given value.
-        pub inline fn splat(value: T) Vec {
+        pub fn splat(value: T) Vec {
             return switch (layout) {
                 .array => .{ .inner = [1]T{value} ** dim },
                 .simd => .{ .inner = @splat(value) },
@@ -178,19 +178,19 @@ pub fn Vector(
         ///
         /// A vector with all elements set to zero, except for the element at the given
         /// index, which is set to one.
-        pub inline fn unit(index: usize) Vec {
+        pub fn unit(index: usize) Vec {
             var result = zero;
             result.set(index, zm.oneValue(T));
             return result;
         }
 
         /// Creates a new vector instance from the provided SIMD vector.
-        pub inline fn fromSimd(simd: @Vector(dim, T)) Vec {
+        pub fn fromSimd(simd: @Vector(dim, T)) Vec {
             return .{ .inner = simd };
         }
 
         /// Creates a new vector instance from the provided array.
-        pub inline fn fromArray(array: [dim]T) Vec {
+        pub fn fromArray(array: [dim]T) Vec {
             return .{ .inner = array };
         }
 
@@ -199,7 +199,7 @@ pub fn Vector(
         /// # Availability
         ///
         /// This function is only available for vectors of dimension 1.
-        pub inline fn initX(x_arg: T) Vec {
+        pub fn initX(x_arg: T) Vec {
             assertDimensionIs("initX()", 1);
             return fromArray(.{x_arg});
         }
@@ -209,7 +209,7 @@ pub fn Vector(
         /// # Availability
         ///
         /// This function is only available for vectors of dimension 2.
-        pub inline fn initXY(x_arg: T, y_arg: T) Vec {
+        pub fn initXY(x_arg: T, y_arg: T) Vec {
             assertDimensionIs("initXY()", 2);
             return fromArray(.{ x_arg, y_arg });
         }
@@ -219,7 +219,7 @@ pub fn Vector(
         /// # Availability
         ///
         /// This function is only available for vectors of dimension 3.
-        pub inline fn initXYZ(x_arg: T, y_arg: T, z_arg: T) Vec {
+        pub fn initXYZ(x_arg: T, y_arg: T, z_arg: T) Vec {
             assertDimensionIs("initXYZ()", 3);
             return fromArray(.{ x_arg, y_arg, z_arg });
         }
@@ -229,7 +229,7 @@ pub fn Vector(
         /// # Availability
         ///
         /// This function is only available for vectors of dimension 4.
-        pub inline fn initXYZW(x_arg: T, y_arg: T, z_arg: T, w_arg: T) Vec {
+        pub fn initXYZW(x_arg: T, y_arg: T, z_arg: T, w_arg: T) Vec {
             assertDimensionIs("initXYZW()", 4);
             return fromArray(.{ x_arg, y_arg, z_arg, w_arg });
         }
@@ -243,7 +243,7 @@ pub fn Vector(
         /// # Availability
         ///
         /// This function is only available for 2D vectors.
-        pub inline fn fromAngle(angle: T) Vec {
+        pub fn fromAngle(angle: T) Vec {
             return initXY(@cos(angle), @sin(angle));
         }
 
@@ -254,7 +254,7 @@ pub fn Vector(
         /// # Returns
         ///
         /// A vector containing the first `new_dim` elements of the original vector.
-        pub inline fn truncateTo(self: Vec, comptime new_dim: usize) Vector(new_dim, T, repr) {
+        pub fn truncateTo(self: Vec, comptime new_dim: usize) Vector(new_dim, T, repr) {
             assertDimensionIsAtLeast("truncateTo()", new_dim);
             const Result = Vector(new_dim, T, repr);
 
@@ -276,7 +276,7 @@ pub fn Vector(
         ///
         /// A vector containing the first `dim - 1` elements of the original vector, omitting
         /// the last element.
-        pub inline fn truncate(self: Vec) Vector(dim - 1, T, repr) {
+        pub fn truncate(self: Vec) Vector(dim - 1, T, repr) {
             assertDimensionIsAtLeast("truncate()", 1);
             return self.truncateTo(dim - 1);
         }
@@ -287,7 +287,7 @@ pub fn Vector(
         ///
         /// This function returns a new vector with the same elements as the
         /// original vector, followed by the new element.
-        pub inline fn extend(self: Vec, new_element: T) Vector(dim + 1, T, repr) {
+        pub fn extend(self: Vec, new_element: T) Vector(dim + 1, T, repr) {
             const Result = Vector(dim + 1, T, repr);
             var result: Result = undefined;
             for (0..dim) |i| result.set(i, self.get(i));
@@ -297,7 +297,7 @@ pub fn Vector(
 
         /// Creates a new vector with the same elements as the original vector, but with a
         /// different representation.
-        pub inline fn toRepr(self: Vec, comptime new_repr: ReprConfig) Vector(dim, T, new_repr) {
+        pub fn toRepr(self: Vec, comptime new_repr: ReprConfig) Vector(dim, T, new_repr) {
             if (comptime repr.eql(new_repr)) {
                 return self;
             } else {
@@ -312,61 +312,61 @@ pub fn Vector(
         // =========================================================================================
 
         /// Returns the first element of the vector.
-        pub inline fn x(self: Vec) T {
+        pub fn x(self: Vec) T {
             assertDimensionIsAtLeast("x()", 1);
             return self.inner[0];
         }
 
         /// Sets the first element of the vector.
-        pub inline fn setX(self: *Vec, value: T) void {
+        pub fn setX(self: *Vec, value: T) void {
             assertDimensionIsAtLeast("setX()", 1);
             self.inner[0] = value;
         }
 
         /// Returns the second element of the vector.
-        pub inline fn y(self: Vec) T {
+        pub fn y(self: Vec) T {
             assertDimensionIsAtLeast("y()", 2);
             return self.inner[1];
         }
 
         /// Sets the second element of the vector.
-        pub inline fn setY(self: *Vec, value: T) void {
+        pub fn setY(self: *Vec, value: T) void {
             assertDimensionIsAtLeast("setY()", 2);
             self.inner[1] = value;
         }
 
         /// Returns the third element of the vector.
-        pub inline fn z(self: Vec) T {
+        pub fn z(self: Vec) T {
             assertDimensionIsAtLeast("z()", 3);
             return self.inner[2];
         }
 
         /// Sets the third element of the vector.
-        pub inline fn setZ(self: *Vec, value: T) void {
+        pub fn setZ(self: *Vec, value: T) void {
             assertDimensionIsAtLeast("setZ()", 3);
             self.inner[2] = value;
         }
 
         /// Returns the fourth element of the vector.
-        pub inline fn w(self: Vec) T {
+        pub fn w(self: Vec) T {
             assertDimensionIsAtLeast("w()", 4);
             return self.inner[3];
         }
 
         /// Sets the fourth element of the vector.
-        pub inline fn setW(self: *Vec, value: T) void {
+        pub fn setW(self: *Vec, value: T) void {
             assertDimensionIsAtLeast("setW()", 4);
             self.inner[3] = value;
         }
 
         /// Returns the element at the given index.
-        pub inline fn get(self: Vec, index: usize) T {
+        pub fn get(self: Vec, index: usize) T {
             assertDimensionIsAtLeast("get()", index + 1);
             return self.inner[index];
         }
 
         /// Sets the element at the given index.
-        pub inline fn set(self: *Vec, index: usize, value: T) void {
+        pub fn set(self: *Vec, index: usize, value: T) void {
             assertDimensionIsAtLeast("set()", index + 1);
             self.inner[index] = value;
         }
@@ -382,7 +382,7 @@ pub fn Vector(
         /// # Returns
         ///
         /// A new vector with the elements swizzled.
-        pub inline fn swizzle(self: Vec, comptime new_dim: usize, comptime indices: [new_dim]comptime_int) Vector(new_dim, T, repr) {
+        pub fn swizzle(self: Vec, comptime new_dim: usize, comptime indices: [new_dim]comptime_int) Vector(new_dim, T, repr) {
             // Make sure all indices are positive.
             comptime {
                 for (indices) |i| {
@@ -411,12 +411,12 @@ pub fn Vector(
         /// # Availability
         ///
         /// This function is only avaialble for types that support SIMD operations.
-        pub inline fn toSimd(self: Vec) @Vector(dim, T) {
+        pub fn toSimd(self: Vec) @Vector(dim, T) {
             return self.inner;
         }
 
         /// Converts the vector to an array.
-        pub inline fn toArray(self: Vec) [dim]T {
+        pub fn toArray(self: Vec) [dim]T {
             return self.inner;
         }
 
@@ -440,7 +440,7 @@ pub fn Vector(
         /// # Returns
         ///
         /// The result of the operation.
-        inline fn invokeBinaryOperation(
+        fn invokeBinaryOperation(
             comptime operation: []const u8,
             comptime Context: type,
             self: Vec,
@@ -448,7 +448,7 @@ pub fn Vector(
         ) Vec {
             const Rhs = @TypeOf(other);
 
-            if (zm.isSimdCompatible(T) and @hasDecl(Context, "invokeOnVector")) {
+            if (comptime zm.isSimdCompatible(T) and @hasDecl(Context, "invokeOnVector")) {
                 // The type `T` can be used with SIMD vectors. Whether we're using a SIMD layout
                 // for the current vector or not does not matter, we can move the values to a
                 // SIMD vector if they are not already in one.
@@ -460,9 +460,9 @@ pub fn Vector(
                     T => break :blk @as(@Vector(dim, T), @splat(other)),
                     @Vector(dim, T) => other,
                     else => {
-                        if (zm.isFloat(T) and Rhs == comptime_float) {
+                        if (comptime zm.isFloat(T) and Rhs == comptime_float) {
                             break :blk @as(@Vector(dim, T), @splat(@as(T, other)));
-                        } else if (zm.isInt(T) and Rhs == comptime_int) {
+                        } else if (comptime zm.isInt(T) and Rhs == comptime_int) {
                             break :blk @as(@Vector(dim, T), @splat(@as(T, other)));
                         }
 
@@ -509,7 +509,7 @@ pub fn Vector(
         /// # Returns
         ///
         /// The result of the operation.
-        inline fn invokeUnaryOperation(
+        fn invokeUnaryOperation(
             comptime Context: type,
             comptime Ret: type,
             self: Vec,
@@ -550,13 +550,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn add(self: Vec, other: anytype) Vec {
+        pub fn add(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs + rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs + rhs;
                 }
             };
@@ -580,13 +580,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn wrappingAdd(self: Vec, other: anytype) Vec {
+        pub fn wrappingAdd(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs +% rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs +% rhs;
                 }
             };
@@ -610,13 +610,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn saturatingAdd(self: Vec, other: anytype) Vec {
+        pub fn saturatingAdd(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs +| rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs +| rhs;
                 }
             };
@@ -640,13 +640,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn sub(self: Vec, other: anytype) Vec {
+        pub fn sub(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs - rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs - rhs;
                 }
             };
@@ -670,13 +670,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn wrappingSub(self: Vec, other: anytype) Vec {
+        pub fn wrappingSub(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs -% rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs -% rhs;
                 }
             };
@@ -700,13 +700,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn saturatingSub(self: Vec, other: anytype) Vec {
+        pub fn saturatingSub(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs -| rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs -| rhs;
                 }
             };
@@ -730,13 +730,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn mul(self: Vec, other: anytype) Vec {
+        pub fn mul(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs * rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs * rhs;
                 }
             };
@@ -760,13 +760,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn wrappingMul(self: Vec, other: anytype) Vec {
+        pub fn wrappingMul(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs *% rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs *% rhs;
                 }
             };
@@ -790,13 +790,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn saturatingMul(self: Vec, other: anytype) Vec {
+        pub fn saturatingMul(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs *| rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs *| rhs;
                 }
             };
@@ -820,13 +820,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn div(self: Vec, other: anytype) Vec {
+        pub fn div(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return lhs / rhs;
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return lhs / rhs;
                 }
             };
@@ -850,13 +850,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn divExact(self: Vec, other: anytype) Vec {
+        pub fn divExact(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return @divExact(lhs, rhs);
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return @divExact(lhs, rhs);
                 }
             };
@@ -880,13 +880,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn divFloor(self: Vec, other: anytype) Vec {
+        pub fn divFloor(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return @divFloor(lhs, rhs);
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return @divFloor(lhs, rhs);
                 }
             };
@@ -910,13 +910,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn divTrunc(self: Vec, other: anytype) Vec {
+        pub fn divTrunc(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return @divTrunc(lhs, rhs);
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return @divTrunc(lhs, rhs);
                 }
             };
@@ -940,13 +940,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn mod(self: Vec, other: anytype) Vec {
+        pub fn mod(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return @mod(lhs, rhs);
                 }
 
-                pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                     return @mod(lhs, rhs);
                 }
             };
@@ -970,9 +970,9 @@ pub fn Vector(
         /// # Returns
         ///
         /// This function returns a vector containing the result of the operation.
-        pub inline fn rem(self: Vec, other: anytype) Vec {
+        pub fn rem(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return @rem(lhs, rhs);
                 }
             };
@@ -986,14 +986,14 @@ pub fn Vector(
         ///
         /// This function returns a vector containing the minimum element-wise value of
         /// two vectors.
-        pub inline fn min(self: Vec, other: anytype) Vec {
+        pub fn min(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return @min(lhs, rhs);
                 }
 
                 // `@min` on vectors crashes the compiler.
-                // pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                // pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                 //     return @min(lhs, rhs);
                 // }
             };
@@ -1007,14 +1007,14 @@ pub fn Vector(
         ///
         /// This function returns a vector containing the maximum element-wise value of
         /// two vectors.
-        pub inline fn max(self: Vec, other: anytype) Vec {
+        pub fn max(self: Vec, other: anytype) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(lhs: T, rhs: T) T {
+                pub fn invokeOnElement(lhs: T, rhs: T) T {
                     return @max(lhs, rhs);
                 }
 
                 // `@max` on vectors crashes the compiler.
-                // pub inline fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
+                // pub fn invokeOnVector(lhs: @Vector(dim, T), rhs: @Vector(dim, T)) @Vector(dim, T) {
                 //     return @max(lhs, rhs);
                 // }
             };
@@ -1025,11 +1025,11 @@ pub fn Vector(
         /// Negates the elements of the vector.
         pub fn neg(self: Vec) Vec {
             const Context = struct {
-                pub inline fn invokeOnElement(val: T) T {
+                pub fn invokeOnElement(val: T) T {
                     return -val;
                 }
 
-                pub inline fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, T) {
+                pub fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, T) {
                     return -val;
                 }
             };
@@ -1052,11 +1052,11 @@ pub fn Vector(
         /// If the input type is a signed integer, the type of the output vector is unsigned.
         pub fn abs(self: Vec) Abs {
             const Context = struct {
-                pub inline fn invokeOnElement(val: T) AbsT {
+                pub fn invokeOnElement(val: T) AbsT {
                     return @abs(val);
                 }
 
-                pub inline fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, AbsT) {
+                pub fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, AbsT) {
                     return @abs(val);
                 }
             };
@@ -1069,7 +1069,7 @@ pub fn Vector(
         /// # Availability
         ///
         /// This function is only available for 2D vectors.
-        pub inline fn rotateAngle(self: Vec, angle: f32) Vec {
+        pub fn rotateAngle(self: Vec, angle: f32) Vec {
             return self.rotate(.fromAngle(angle));
         }
 
@@ -1088,7 +1088,7 @@ pub fn Vector(
         /// # Availability
         ///
         /// This function is only available for 2D vectors.
-        pub inline fn rotate(self: Vec, other: Vec) Vec {
+        pub fn rotate(self: Vec, other: Vec) Vec {
             return initXY(
                 self.x() * other.x() - self.y() * other.y(),
                 self.y() * other.x() + self.x() * other.y(),
@@ -1100,7 +1100,7 @@ pub fn Vector(
         // =========================================================================================
 
         /// Computes the sum of all elements in the vector.
-        pub inline fn elementSum(self: Vec) T {
+        pub fn elementSum(self: Vec) T {
             if (dim == 0) return zm.zeroValue(T);
 
             if (zm.isSimdCompatible(T)) {
@@ -1114,7 +1114,7 @@ pub fn Vector(
         }
 
         /// Computes the product of all elements in the vector.
-        pub inline fn elementProduct(self: Vec) T {
+        pub fn elementProduct(self: Vec) T {
             if (dim == 0) return zm.oneValue(T);
 
             if (zm.isSimdCompatible(T)) {
@@ -1128,7 +1128,7 @@ pub fn Vector(
         }
 
         /// Computes the maximum element in the vector.
-        pub inline fn elementMax(self: Vec) T {
+        pub fn elementMax(self: Vec) T {
             assertDimensionIsAtLeast("elementMax()", 1);
 
             if (zm.isSimdCompatible(T)) {
@@ -1142,7 +1142,7 @@ pub fn Vector(
         }
 
         /// Computes the minimum element in the vector.
-        pub inline fn elementMin(self: Vec) T {
+        pub fn elementMin(self: Vec) T {
             assertDimensionIsAtLeast("elementMin()", 1);
 
             if (zm.isSimdCompatible(T)) {
@@ -1172,7 +1172,7 @@ pub fn Vector(
         /// # Returns
         ///
         /// The squared Euclidean length of the vector.
-        pub inline fn lengthSquared(self: Vec) T {
+        pub fn lengthSquared(self: Vec) T {
             if (dim == 0) return zm.zeroValue(T);
 
             if (zm.isSimdCompatible(T)) {
@@ -1198,7 +1198,7 @@ pub fn Vector(
         /// # Returns
         ///
         /// The Euclidean length of the vector.
-        pub inline fn length(self: Vec) T {
+        pub fn length(self: Vec) T {
             return @sqrt(self.lengthSquared());
         }
 
@@ -1208,7 +1208,7 @@ pub fn Vector(
         ///
         /// A vector of length one, with the same direction as the original vector, or null
         /// if the original vector was too close to zero.
-        pub inline fn normalizeOrNull(self: Vec) ?Vec {
+        pub fn normalizeOrNull(self: Vec) ?Vec {
             const inv_len: T = 1.0 / self.length();
             if (!std.math.isFinite(inv_len)) return null;
             return self.mul(inv_len);
@@ -1224,13 +1224,13 @@ pub fn Vector(
         /// # Returns
         ///
         /// A vector of length one, with the same direction as the original vector.
-        pub inline fn normalize(self: Vec) Vec {
+        pub fn normalize(self: Vec) Vec {
             return self.normalizeOrNull().?;
         }
 
         /// Attempts to normalize the vector, returning zero if the original vector was too close
         /// to zero.
-        pub inline fn normalizeOrZero(self: Vec) Vec {
+        pub fn normalizeOrZero(self: Vec) Vec {
             return self.normalizeOrNull() orelse self;
         }
 
@@ -1243,12 +1243,12 @@ pub fn Vector(
         /// typically around `1e-4`.
         ///
         /// If you're working with integers, then the tolerance value is not used.
-        pub inline fn isNormalized(self: Vec, tolerance: T) bool {
-            if (zm.isInt(T)) {
+        pub fn isNormalized(self: Vec, tolerance: T) bool {
+            if (comptime zm.isInt(T)) {
                 return self.lengthSquared() == 1;
             }
 
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 // NOTE: We're multiplying the tolerance by 2.0 to account for the fact that
                 // we are working with squared lengths here. It doesn't perfectly account for
                 // the skewed space, but it's a good enough approximation.
@@ -1271,7 +1271,7 @@ pub fn Vector(
         /// # Returns
         ///
         /// The squared Euclidean distance between the two vectors.
-        pub inline fn distanceSquared(self: Vec, other: Vec) T {
+        pub fn distanceSquared(self: Vec, other: Vec) T {
             // We handle unsigned integers specially because they have a defined absolute
             // difference even though the subtraction can underflow.
             if (zm.isUnsignedInt(T)) {
@@ -1293,7 +1293,7 @@ pub fn Vector(
         /// # Returns
         ///
         /// The Euclidean distance between the two vectors.
-        pub inline fn distance(self: Vec, other: Vec) T {
+        pub fn distance(self: Vec, other: Vec) T {
             return @sqrt(self.distanceSquared(other));
         }
 
@@ -1306,7 +1306,7 @@ pub fn Vector(
         ///
         /// It can be interpreted as the product of their lengths and the cosine of the angle
         /// between them: `cos(angle) * length(self) * length(other)`.
-        pub inline fn dot(self: Vec, other: Vec) T {
+        pub fn dot(self: Vec, other: Vec) T {
             return self.mul(other).elementSum();
         }
 
@@ -1315,7 +1315,7 @@ pub fn Vector(
         /// # Availability
         ///
         /// The cross-product is only defined for vectors of dimension 3.
-        pub inline fn cross(self: Vec, other: Vec) Vec {
+        pub fn cross(self: Vec, other: Vec) Vec {
             assertDimensionIs("cross()", 3);
             return .{ .inner = zm.simd.cross(T, self.toSimd(), other.toSimd()) };
         }
@@ -1329,7 +1329,7 @@ pub fn Vector(
         /// # Remarks
         ///
         /// If you know that `other` is normalized, consider using `projectOntoNormalized` instead.
-        pub inline fn projectOnto(self: Vec, other: Vec) Vec {
+        pub fn projectOnto(self: Vec, other: Vec) Vec {
             const inv_dot = 1.0 / self.dot(other);
             std.debug.assert(std.math.isFinite(inv_dot));
             return other.mul(self.dot(other)).mul(inv_dot);
@@ -1340,7 +1340,7 @@ pub fn Vector(
         /// # Valid Usage
         ///
         /// `other` must be normalized.
-        pub inline fn projectOntoNormalized(self: Vec, other: Vec) Vec {
+        pub fn projectOntoNormalized(self: Vec, other: Vec) Vec {
             std.debug.assert(other.isNormalized(util.toleranceFor(T)));
             return other.mul(self.dot(other));
         }
@@ -1354,7 +1354,7 @@ pub fn Vector(
         /// # Remarks
         ///
         /// If you know that `other` is normalized, use `projectOntoNormalized` instead.
-        pub inline fn rejectFrom(self: Vec, other: Vec) Vec {
+        pub fn rejectFrom(self: Vec, other: Vec) Vec {
             return self.sub(self.projectOnto(other));
         }
 
@@ -1363,7 +1363,7 @@ pub fn Vector(
         /// # Valid Usage
         ///
         /// `other` must be normalized.
-        pub inline fn rejectFromNormalized(self: Vec, other: Vec) Vec {
+        pub fn rejectFromNormalized(self: Vec, other: Vec) Vec {
             return self.sub(self.projectOntoNormalized(other));
         }
 
@@ -1379,7 +1379,7 @@ pub fn Vector(
         ///
         /// A vector which has a length clamped between `lower_bound` and `upper_bound`,
         /// preserving the its original direction.
-        pub inline fn clampLength(self: Vec, lower_bound: T, upper_bound: T) Vec {
+        pub fn clampLength(self: Vec, lower_bound: T, upper_bound: T) Vec {
             std.debug.assert(0.0 <= lower_bound);
             std.debug.assert(lower_bound <= upper_bound);
             const sq_len = self.lengthSquared();
@@ -1406,7 +1406,7 @@ pub fn Vector(
         ///
         /// A vector which has its length clamped bellow the provided upper bound
         /// but preserving its original direction.
-        pub inline fn clampLengthMax(self: Vec, upper_bound: f32) Vec {
+        pub fn clampLengthMax(self: Vec, upper_bound: f32) Vec {
             std.debug.assert(0.0 <= upper_bound);
             const sq_len = self.lengthSquared();
             if (sq_len > upper_bound * upper_bound) {
@@ -1428,7 +1428,7 @@ pub fn Vector(
         ///
         /// A vector which has its length clamped above the provided lower bound
         /// but preserving its original direction.
-        pub inline fn clampLengthMin(self: Vec, lower_bound: f32) Vec {
+        pub fn clampLengthMin(self: Vec, lower_bound: f32) Vec {
             std.debug.assert(0.0 <= lower_bound);
             const sq_len = self.lengthSquared();
             if (sq_len < lower_bound * lower_bound) {
@@ -1451,7 +1451,7 @@ pub fn Vector(
         /// Any vector that is orthogonal to the provided one. Note that the result may or may
         /// not be normalzied. If you need a normalized output, use
         /// `anyOrthogonalVectorNormalized`.
-        pub inline fn anyOrthogonalVector(self: Vec) Vec {
+        pub fn anyOrthogonalVector(self: Vec) Vec {
             if (@abs(self.x()) > @abs(self.y())) {
                 return initXYZ(-self.z(), 0.0, self.x()); // self.cross(unit_y)
             } else {
@@ -1468,7 +1468,7 @@ pub fn Vector(
         /// # Returns
         ///
         /// A normalized vector that is orthogonal to the provided one.
-        pub inline fn anyOrthogonalVectorNormalized(self: Vec) Vec {
+        pub fn anyOrthogonalVectorNormalized(self: Vec) Vec {
             std.debug.assert(self.isNormalized(util.toleranceFor(T)));
 
             // From https://graphics.pixar.com/library/OrthonormalB/paper.pdf
@@ -1483,15 +1483,15 @@ pub fn Vector(
         // =========================================================================================
 
         /// Returns whether all of the vector's components are finite.
-        pub inline fn isFinite(self: Vec) bool {
-            if (!zm.isFloat(T)) return true;
+        pub fn isFinite(self: Vec) bool {
+            if (comptime !zm.isFloat(T)) return true;
             for (0..dim) |i| if (!std.math.isFinite(self.get(i))) return false;
             return true;
         }
 
         /// Returns whether any of the vector's components are `NaN`.
-        pub inline fn isNan(self: Vec) bool {
-            if (!zm.isFloat(T)) return false;
+        pub fn isNan(self: Vec) bool {
+            if (comptime !zm.isFloat(T)) return false;
             for (0..dim) |i| if (std.math.isNan(self.get(i))) return true;
             return false;
         }
@@ -1504,7 +1504,7 @@ pub fn Vector(
         /// dimension.
         ///
         /// Outside of compile-time evaluation, this function asserts the fact.
-        inline fn assertDimensionIs(comptime symbol: []const u8, expected_dim: usize) void {
+        fn assertDimensionIs(comptime symbol: []const u8, expected_dim: usize) void {
             if (@inComptime() and expected_dim != dim) {
                 const err = std.fmt.comptimePrint("`{s}` expects a vector of dimension {}, got {}", .{ symbol, dim, expected_dim });
                 @compileError(err);
@@ -1517,7 +1517,7 @@ pub fn Vector(
         /// dimension.
         ///
         /// Outside of compile-time evaluation, this function asserts the fact.
-        inline fn assertDimensionIsAtLeast(comptime symbol: []const u8, minimum_dim: usize) void {
+        fn assertDimensionIsAtLeast(comptime symbol: []const u8, minimum_dim: usize) void {
             if (@inComptime() and dim < minimum_dim) {
                 const err = std.fmt.comptimePrint("`{s}` expects a vector of dimension at least {}, got {}", .{ symbol, minimum_dim, dim });
                 @compileError(err);
@@ -1555,8 +1555,8 @@ pub fn Vector(
         }
 
         test "layout guarantees" {
-            if (repr.preserve_alignment) try std.testing.expectEqual(@alignOf([dim]T), @alignOf(Vec));
-            if (repr.preserve_size) try std.testing.expectEqual(@sizeOf([dim]T), @sizeOf(Vec));
+            if (comptime repr.preserve_alignment) try std.testing.expectEqual(@alignOf([dim]T), @alignOf(Vec));
+            if (comptime repr.preserve_size) try std.testing.expectEqual(@sizeOf([dim]T), @sizeOf(Vec));
         }
 
         test zero {
@@ -1584,7 +1584,7 @@ pub fn Vector(
         }
 
         test nan {
-            if (!zm.isFloat(T)) return;
+            if (comptime !zm.isFloat(T)) return;
             const vector = Vec.nan;
             for (0..dim) |i| try std.testing.expect(std.math.isNan(vector.get(i)));
         }
@@ -1596,7 +1596,7 @@ pub fn Vector(
         }
 
         test unit_x {
-            if (dim < 1) return;
+            if (comptime dim < 1) return;
             for (0..dim) |i| {
                 if (i == 0) {
                     try std.testing.expectEqual(zm.oneValue(T), unit_x.get(i));
@@ -1607,7 +1607,7 @@ pub fn Vector(
         }
 
         test unit_y {
-            if (dim < 2) return;
+            if (comptime dim < 2) return;
             for (0..dim) |i| {
                 if (i == 1) {
                     try std.testing.expectEqual(zm.oneValue(T), unit_y.get(i));
@@ -1618,7 +1618,7 @@ pub fn Vector(
         }
 
         test unit_z {
-            if (dim < 3) return;
+            if (comptime dim < 3) return;
             for (0..dim) |i| {
                 if (i == 2) {
                     try std.testing.expectEqual(zm.oneValue(T), unit_z.get(i));
@@ -1629,7 +1629,7 @@ pub fn Vector(
         }
 
         test unit_w {
-            if (dim < 4) return;
+            if (comptime dim < 4) return;
             for (0..dim) |i| {
                 if (i == 3) {
                     try std.testing.expectEqual(zm.oneValue(T), unit_w.get(i));
@@ -1665,7 +1665,7 @@ pub fn Vector(
         }
 
         test add {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const sum = v1.add(v2);
@@ -1673,7 +1673,7 @@ pub fn Vector(
         }
 
         test wrappingAdd {
-            if (!zm.isInt(T)) return;
+            if (comptime !zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const sum = v1.wrappingAdd(v2);
@@ -1681,7 +1681,7 @@ pub fn Vector(
         }
 
         test saturatingAdd {
-            if (!zm.isInt(T)) return;
+            if (comptime !zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const sum = v1.saturatingAdd(v2);
@@ -1689,10 +1689,10 @@ pub fn Vector(
         }
 
         test sub {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             var v1 = util.arbitrary(Vec, 10);
             var v2 = util.arbitrary(Vec, 10);
-            if (zm.isUnsignedInt(T)) {
+            if (comptime zm.isUnsignedInt(T)) {
                 // Prevent underflow with unsigned ints.
                 const t1 = v1;
                 const t2 = v2;
@@ -1704,7 +1704,7 @@ pub fn Vector(
         }
 
         test wrappingSub {
-            if (!zm.isInt(T)) return;
+            if (comptime !zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const diff = v1.wrappingSub(v2);
@@ -1712,7 +1712,7 @@ pub fn Vector(
         }
 
         test saturatingSub {
-            if (!zm.isInt(T)) return;
+            if (comptime !zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const diff = v1.saturatingSub(v2);
@@ -1720,7 +1720,7 @@ pub fn Vector(
         }
 
         test mul {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             var v1 = util.arbitrary(Vec, 10);
             var v2 = util.arbitrary(Vec, 10);
             const prod = v1.mul(v2);
@@ -1728,7 +1728,7 @@ pub fn Vector(
         }
 
         test wrappingMul {
-            if (!zm.isInt(T)) return;
+            if (comptime !zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const prod = v1.wrappingMul(v2);
@@ -1736,7 +1736,7 @@ pub fn Vector(
         }
 
         test saturatingMul {
-            if (!zm.isInt(T)) return;
+            if (comptime !zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const prod = v1.saturatingMul(v2);
@@ -1744,7 +1744,7 @@ pub fn Vector(
         }
 
         test div {
-            if (!zm.isUnsignedInt(T) and !zm.isFloat(T)) return;
+            if (comptime !zm.isUnsignedInt(T) and !zm.isFloat(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
@@ -1753,7 +1753,7 @@ pub fn Vector(
         }
 
         test divExact {
-            if (!zm.isInt(T)) return;
+            if (comptime !zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             for (0..dim) |i| if (v1.get(i) == zm.zeroValue(T)) return; // unlucky
             const result = util.arbitrary(Vec, 10);
@@ -1763,7 +1763,7 @@ pub fn Vector(
         }
 
         test divFloor {
-            if (!zm.isInt(T)) return;
+            if (comptime !zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
@@ -1772,7 +1772,7 @@ pub fn Vector(
         }
 
         test divTrunc {
-            if (!zm.isInt(T)) return;
+            if (comptime !zm.isInt(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
@@ -1781,7 +1781,7 @@ pub fn Vector(
         }
 
         test mod {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
@@ -1790,7 +1790,7 @@ pub fn Vector(
         }
 
         test rem {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             for (0..dim) |i| if (v2.get(i) == zm.zeroValue(T)) return; // unlucky
@@ -1799,7 +1799,7 @@ pub fn Vector(
         }
 
         test min {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const result = v1.min(v2);
@@ -1807,7 +1807,7 @@ pub fn Vector(
         }
 
         test max {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             const result = v1.max(v2);
@@ -1815,27 +1815,27 @@ pub fn Vector(
         }
 
         test neg {
-            if (!zm.isSigned(T)) return;
+            if (comptime !zm.isSigned(T)) return;
             const v = util.arbitrary(Vec, 10);
             const result = v.neg();
             for (0..dim) |i| try std.testing.expectEqual(-v.get(i), result.get(i));
         }
 
         test abs {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v = util.arbitrary(Vec, 10);
             const result = v.abs();
             for (0..dim) |i| try std.testing.expectEqual(@abs(v.get(i)), result.get(i));
         }
 
         test lengthSquared {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v = util.arbitrary(Vec, 10);
 
             var expected = zm.zeroValue(T);
             for (0..dim) |i| expected += v.get(i) * v.get(i);
 
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 try std.testing.expectApproxEqRel(expected, v.lengthSquared(), util.toleranceFor(T));
             } else {
                 try std.testing.expectEqual(expected, v.lengthSquared());
@@ -1843,7 +1843,7 @@ pub fn Vector(
         }
 
         test length {
-            if (!zm.isFloat(T)) return;
+            if (comptime !zm.isFloat(T)) return;
             const v = util.arbitrary(Vec, 10);
 
             var expected = zm.zeroValue(T);
@@ -1853,7 +1853,7 @@ pub fn Vector(
         }
 
         test normalizeOrNull {
-            if (!zm.isFloat(T) or dim == 0) return;
+            if (comptime !zm.isFloat(T) or dim == 0) return;
 
             const v1 = util.arbitrary(Vec, 10);
             const len = v1.length();
@@ -1868,7 +1868,7 @@ pub fn Vector(
         }
 
         test normalize {
-            if (!zm.isFloat(T) or dim == 0) return;
+            if (comptime !zm.isFloat(T) or dim == 0) return;
 
             const v1 = util.arbitrary(Vec, 10);
             const len = v1.length();
@@ -1880,7 +1880,7 @@ pub fn Vector(
 
         test normalizeOrZero {
             // NOTE: `f16` just isn't precise enough for normalization to mean anything.
-            if (!zm.isFloat(T) or dim == 0) return;
+            if (comptime !zm.isFloat(T) or dim == 0) return;
 
             const v1 = util.arbitrary(Vec, 10);
             const len = v1.length();
@@ -1895,9 +1895,9 @@ pub fn Vector(
         }
 
         test isNormalized {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
 
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 const v1 = util.arbitrary(Vec, 10);
                 if (std.math.isFinite(1.0 / v1.length())) {
                     try std.testing.expect(v1.normalize().isNormalized(util.toleranceFor(T)));
@@ -1905,7 +1905,7 @@ pub fn Vector(
             }
 
             const tolerance =
-                if (zm.isFloat(T))
+                if (comptime zm.isFloat(T))
                     util.toleranceFor(T)
                 else
                     0;
@@ -1914,7 +1914,7 @@ pub fn Vector(
             if (dim >= 2) try std.testing.expect(Vec.unit_y.isNormalized(tolerance));
             if (dim >= 3) try std.testing.expect(Vec.unit_z.isNormalized(tolerance));
             if (dim >= 4) try std.testing.expect(Vec.unit_w.isNormalized(tolerance));
-            if (zm.isSigned(T)) {
+            if (comptime zm.isSigned(T)) {
                 if (dim >= 1) try std.testing.expect(Vec.unit_neg_x.isNormalized(tolerance));
                 if (dim >= 2) try std.testing.expect(Vec.unit_neg_y.isNormalized(tolerance));
                 if (dim >= 3) try std.testing.expect(Vec.unit_neg_z.isNormalized(tolerance));
@@ -1923,14 +1923,14 @@ pub fn Vector(
         }
 
         test dot {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
 
             var result = zm.zeroValue(T);
             for (0..dim) |i| result += v1.get(i) * v2.get(i);
 
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 try std.testing.expectApproxEqRel(v1.dot(v2), v2.dot(v1), util.toleranceFor(T));
                 try std.testing.expectApproxEqRel(v1.lengthSquared(), v1.dot(v1), util.toleranceFor(T));
                 try std.testing.expectApproxEqAbs(result, v1.dot(v2), util.toleranceFor(T));
@@ -1942,7 +1942,7 @@ pub fn Vector(
         }
 
         test elementSum {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v = util.arbitrary(Vec, 10);
             var result = zm.zeroValue(T);
             for (0..dim) |i| result += v.get(i);
@@ -1950,7 +1950,7 @@ pub fn Vector(
         }
 
         test elementProduct {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v = util.arbitrary(Vec, 10);
             var result = zm.oneValue(T);
             for (0..dim) |i| result *= v.get(i);
@@ -1958,7 +1958,7 @@ pub fn Vector(
         }
 
         test elementMin {
-            if (!zm.isNumber(T) or dim == 0) return;
+            if (comptime !zm.isNumber(T) or dim == 0) return;
             const v = util.arbitrary(Vec, 10);
             var result = zm.maxValue(T);
             for (0..dim) |i| result = @min(result, v.get(i));
@@ -1966,7 +1966,7 @@ pub fn Vector(
         }
 
         test elementMax {
-            if (!zm.isNumber(T) or dim == 0) return;
+            if (comptime !zm.isNumber(T) or dim == 0) return;
             const v = util.arbitrary(Vec, 10);
             var result = zm.minValue(T);
             for (0..dim) |i| result = @max(result, v.get(i));
@@ -1974,7 +1974,7 @@ pub fn Vector(
         }
 
         test distanceSquared {
-            if (!zm.isNumber(T)) return;
+            if (comptime !zm.isNumber(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             var result = zm.zeroValue(T);
@@ -1991,7 +1991,7 @@ pub fn Vector(
                     result += (v1.get(i) - v2.get(i)) * (v1.get(i) - v2.get(i));
                 }
             }
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 try std.testing.expectApproxEqAbs(result, v1.distanceSquared(v2), util.toleranceFor(T));
             } else {
                 try std.testing.expectEqual(result, v1.distanceSquared(v2));
@@ -1999,7 +1999,7 @@ pub fn Vector(
         }
 
         test distance {
-            if (!zm.isFloat(T)) return;
+            if (comptime !zm.isFloat(T)) return;
             const v1 = util.arbitrary(Vec, 10);
             const v2 = util.arbitrary(Vec, 10);
             var result = zm.zeroValue(T);
@@ -2009,7 +2009,7 @@ pub fn Vector(
         }
 
         test isFinite {
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 var v = zero;
 
                 if (dim == 0) {
@@ -2026,7 +2026,7 @@ pub fn Vector(
         }
 
         test isNan {
-            if (zm.isFloat(T)) {
+            if (comptime zm.isFloat(T)) {
                 var v = zero;
 
                 if (dim == 0) {
@@ -2043,7 +2043,7 @@ pub fn Vector(
         }
 
         test cross {
-            if (dim != 3 or !zm.isSigned(T)) return;
+            if (comptime dim != 3 or !zm.isSigned(T)) return;
             const v1 = Vec.initXYZ(zm.cast(T, 1), zm.cast(T, 2), zm.cast(T, 3));
             const v2 = Vec.initXYZ(zm.cast(T, 3), zm.cast(T, 4), zm.cast(T, 5));
             const result = v1.cross(v2);

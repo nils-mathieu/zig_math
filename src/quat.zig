@@ -1,7 +1,7 @@
-const zm = @import("root.zig");
 const std = @import("std");
-const util = @import("util.zig");
 
+const util = @import("util.zig");
+const zm = @import("root.zig");
 const ReprConfig = zm.ReprConfig;
 
 /// Creates new quaternion type with the given element type and representation.
@@ -42,17 +42,17 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         pub const nan = init(std.math.nan(T), std.math.nan(T), std.math.nan(T), std.math.nan(T));
 
         /// Initializes a new quaternion with the given components.
-        pub inline fn init(x: T, y: T, z: T, w: T) Quat {
+        pub fn init(x: T, y: T, z: T, w: T) Quat {
             return .{ .inner = .initXYZW(x, y, z, w) };
         }
 
         /// Creates a new quaternion from the provided 4D vector.
-        pub inline fn fromVec4(vec: Vec4) Quat {
+        pub fn fromVec4(vec: Vec4) Quat {
             return .{ .inner = vec };
         }
 
         /// Creates a new quaternion with the same representation as the current one.
-        pub inline fn toRepr(self: Quat, new_repr: ReprConfig) Quaternion(T, new_repr) {
+        pub fn toRepr(self: Quat, new_repr: ReprConfig) Quaternion(T, new_repr) {
             return .fromVec4(self.inner.toRepr(new_repr));
         }
 
@@ -66,7 +66,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         /// # Valid Usage
         ///
         /// The caller must ensure that the provided axis is normalized.
-        pub inline fn fromAxisAngle(axis: Vec3, angle: T) Quat {
+        pub fn fromAxisAngle(axis: Vec3, angle: T) Quat {
             std.debug.assert(axis.isNormalized(util.toleranceFor(T)));
             const half = angle * 0.5;
             return fromVec4(axis.mul(@sin(half)).extend(@cos(angle)));
@@ -74,7 +74,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
 
         /// Creates a new quaternion representing a rotation around the provided
         /// axis. The angle is measured in radians as length of the axis vector.
-        pub inline fn fromScaledAxis(axis: Vec3) Quat {
+        pub fn fromScaledAxis(axis: Vec3) Quat {
             const len = axis.length();
             const inv_len = 1.0 / len;
             if (!std.math.isFinite(inv_len)) {
@@ -87,7 +87,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         /// Creates a new quaternion from the provided `angle` measured in radians.
         ///
         /// The resulting rotation is made around the X axis.
-        pub inline fn fromRotationX(angle: T) Quat {
+        pub fn fromRotationX(angle: T) Quat {
             const half = angle * 0.5;
             return init(@sin(half), 0.0, 0.0, @cos(half));
         }
@@ -95,7 +95,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         /// Creates a new quaternion from the provided `angle` measured in radians.
         ///
         /// The resulting rotation is made around the Y axis.
-        pub inline fn fromRotationY(angle: T) Quat {
+        pub fn fromRotationY(angle: T) Quat {
             const half = angle * 0.5;
             return init(0.0, @sin(half), 0.0, @cos(half));
         }
@@ -103,7 +103,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         /// Creates a new quaternion from the provided `angle` measured in radians.
         ///
         /// The resulting rotation is made around the Z axis.
-        pub inline fn fromRotationZ(angle: T) Quat {
+        pub fn fromRotationZ(angle: T) Quat {
             const half = angle * 0.5;
             return init(0.0, 0.0, @sin(half), @cos(half));
         }
@@ -116,7 +116,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         ///
         /// 1. The rotation of `self` on its own axis by the angle of `other`.
         /// 2. The rotation of `other` by `self` on `self`'s axis.
-        pub inline fn mulQuat(self: Quat, other: Quat) Quat {
+        pub fn mulQuat(self: Quat, other: Quat) Quat {
             // https://github.com/bitshifter/glam-rs/blob/600b139ef2c3fb1bb9529cfd4d9c53308c038021/src/f32/coresimd/quat.rs#L769-L801
 
             const Simd = @Vector(4, T);
@@ -157,7 +157,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
 
         /// Multiplies a quaternion by the provided SIMD vector, returning `other` rotated
         /// by `self`.
-        pub inline fn mulSimd(self: Quat, other: @Vector(3, T)) @Vector(3, T) {
+        pub fn mulSimd(self: Quat, other: @Vector(3, T)) @Vector(3, T) {
             // https://github.com/bitshifter/glam-rs/blob/576eafe84af5eca361b0420314381e9923517974/src/f32/coresimd/quat.rs#L828-L839
 
             const dot = zm.simd.dot;
@@ -181,7 +181,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         }
 
         /// Multiplies a quaternion by the provided vector, returning `other` rotated by `self`.
-        pub inline fn mulVec(self: Quat, other: Vec3) Vec3 {
+        pub fn mulVec(self: Quat, other: Vec3) Vec3 {
             return .fromSimd(self.mulSimd(other.toSimd()));
         }
 
@@ -215,7 +215,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         /// # Returns
         ///
         /// The resulting type depends on the input operands.
-        pub inline fn mul(self: Quat, other: anytype) Mul(@TypeOf(other)) {
+        pub fn mul(self: Quat, other: anytype) Mul(@TypeOf(other)) {
             return switch (@TypeOf(other)) {
                 Vec3 => self.mulVec(other),
                 Quat => self.mulQuat(other),
@@ -229,7 +229,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         // =========================================================================================
 
         /// Returns whether the quaternion is normalized (has a length of 1).
-        pub inline fn isNormalized(self: Quat, tolerance: T) bool {
+        pub fn isNormalized(self: Quat, tolerance: T) bool {
             return self.inner.isNormalized(tolerance);
         }
 
@@ -238,7 +238,7 @@ pub fn Quaternion(comptime T: type, comptime repr: ReprConfig) type {
         /// # Valid Usage
         ///
         /// The caller must ensure that the quaternion is not zero.
-        pub inline fn normalize(self: Quat) Quat {
+        pub fn normalize(self: Quat) Quat {
             return fromVec4(self.inner.normalize());
         }
     };
