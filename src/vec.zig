@@ -1531,13 +1531,11 @@ pub fn Vector(
         // =========================================================================================
 
         /// Formats the vector to the provided writer.
-        pub fn format(self: Vec, comptime fmt: []const u8, opts: std.fmt.FormatOptions, writer: anytype) !void {
-            _ = opts;
-
+        pub fn format(self: Vec, writer: *std.io.Writer) std.io.Writer.Error!void {
             try writer.writeByte('[');
             for (0..dim) |i| {
                 if (i > 0) try writer.writeAll(", ");
-                try std.fmt.formatType(self.get(i), fmt, .{}, writer, std.options.fmt_max_depth);
+                try writer.printValue("d", .{}, self.get(i), 0);
             }
             try writer.writeByte(']');
         }

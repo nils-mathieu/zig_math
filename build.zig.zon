@@ -1,7 +1,7 @@
 .{
     .name = .zig_math,
     .fingerprint = 0x614de7ae771f9041,
-    .version = "0.0.1",
+    .version = "0.0.2",
     .paths = .{
         "build.zig",
         "build.zig.zon",

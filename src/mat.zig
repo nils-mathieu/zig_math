@@ -833,19 +833,17 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         // =========================================================================================
 
         /// Formats the matrix to the provided writer.
-        pub fn format(self: Mat, comptime fmt: []const u8, opts: std.fmt.FormatOptions, writer: anytype) !void {
-            _ = opts;
-
+        pub fn format(self: Mat, writer: *std.io.Writer) std.io.Writer.Error!void {
             try writer.writeAll("[\n");
             for (0..rows) |i| {
                 try writer.writeAll("    ");
                 for (0..columns) |j| {
-                    try std.fmt.formatType(self.get(i, j), fmt, .{ .width = 5, .alignment = .right, .precision = 2 }, writer, std.options.fmt_max_depth);
-                    try writer.writeAll(" ");
+                    try writer.printValue("d", self.get(i, j), .{ .width = 5, .alignment = .right, .precision = 2 }, writer, 0);
+                    try writer.writeByte(' ');
                 }
-                try writer.writeAll("\n");
+                try writer.writeByte('\n');
             }
-            try writer.writeAll("]");
+            try writer.writeByte(']');
         }
 
         // Implementation detail used by some functions to determine whether a type is a matrix.
