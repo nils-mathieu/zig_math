@@ -260,8 +260,8 @@ pub fn Vector(
 
             if (layout == .simd and Result.layout == .simd) {
                 // Use @shuffle when the output is a SIMD vector too.
-                comptime var mask: @Vector(i32, new_dim) = undefined;
-                for (0..new_dim) |i| mask[i] = @intCast(i);
+                comptime var mask: @Vector(new_dim, i32) = undefined;
+                inline for (0..new_dim) |i| mask[i] = @intCast(i);
                 return .fromSimd(@shuffle(T, self.inner, undefined, mask));
             }
 
@@ -323,6 +323,12 @@ pub fn Vector(
             self.inner[0] = value;
         }
 
+        /// Returns a pointer to the first element of the vector.
+        pub fn xPtr(self: *Vec) *T {
+            assertDimensionIsAtLeast("xPtr()", 1);
+            return &self.inner[0];
+        }
+
         /// Returns the second element of the vector.
         pub fn y(self: Vec) T {
             assertDimensionIsAtLeast("y()", 2);
@@ -333,6 +339,12 @@ pub fn Vector(
         pub fn setY(self: *Vec, value: T) void {
             assertDimensionIsAtLeast("setY()", 2);
             self.inner[1] = value;
+        }
+
+        /// Returns a pointer to the second element of the vector.
+        pub fn yPtr(self: *Vec) *T {
+            assertDimensionIsAtLeast("yPtr()", 2);
+            return &self.inner[1];
         }
 
         /// Returns the third element of the vector.
@@ -347,6 +359,12 @@ pub fn Vector(
             self.inner[2] = value;
         }
 
+        /// Returns a pointer to the third element of the vector.
+        pub fn zPtr(self: *Vec) *T {
+            assertDimensionIsAtLeast("zPtr()", 3);
+            return &self.inner[2];
+        }
+
         /// Returns the fourth element of the vector.
         pub fn w(self: Vec) T {
             assertDimensionIsAtLeast("w()", 4);
@@ -359,10 +377,22 @@ pub fn Vector(
             self.inner[3] = value;
         }
 
+        /// Returns a pointer to the fourth element of the vector.
+        pub fn wPtr(self: *Vec) *T {
+            assertDimensionIsAtLeast("wPtr()", 4);
+            return &self.inner[3];
+        }
+
         /// Returns the element at the given index.
         pub fn get(self: Vec, index: usize) T {
             assertDimensionIsAtLeast("get()", index + 1);
             return self.inner[index];
+        }
+
+        /// Returns a pointer to the element at the given index.
+        pub fn getPtr(self: *Vec, index: usize) *T {
+            assertDimensionIsAtLeast("ptr()", index + 1);
+            return &self.inner[index];
         }
 
         /// Sets the element at the given index.
@@ -1037,6 +1067,87 @@ pub fn Vector(
             return invokeUnaryOperation(Context, Vec, self);
         }
 
+        /// Computes the `@floor` of each element of the vector.
+        pub fn floor(self: Vec) Vec {
+            const Context = struct {
+                pub fn invokeOnElement(val: T) T {
+                    return @floor(val);
+                }
+
+                pub fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, T) {
+                    return @floor(val);
+                }
+            };
+
+            return invokeUnaryOperation(Context, Vec, self);
+        }
+
+        /// Computes the `@ceil` of each element of the vector.
+        pub fn ceil(self: Vec) Vec {
+            const Context = struct {
+                pub fn invokeOnElement(val: T) T {
+                    return @ceil(val);
+                }
+
+                pub fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, T) {
+                    return @ceil(val);
+                }
+            };
+
+            return invokeUnaryOperation(Context, Vec, self);
+        }
+
+        /// Computes the `@round` of each element of the vector.
+        pub fn round(self: Vec) Vec {
+            const Context = struct {
+                pub fn invokeOnElement(val: T) T {
+                    return @round(val);
+                }
+
+                pub fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, T) {
+                    return @round(val);
+                }
+            };
+
+            return invokeUnaryOperation(Context, Vec, self);
+        }
+
+        /// Computes the fast floor of each element of the vector, returning an
+        /// integer vector.
+        pub fn fastFloorI(self: Vec, comptime I: type) Vector(dim, I, repr) {
+            const Context = struct {
+                pub fn invokeOnElement(val: T) I {
+                    return @intFromFloat(if (val >= 0) val else val - 1.0);
+                }
+
+                pub fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, I) {
+                    const val0: @Vector(dim, T) = @splat(0.0);
+                    const val1: @Vector(dim, T) = @splat(1.0);
+                    return @intFromFloat(@select(f32, val >= val0, val, val - val1));
+                }
+            };
+
+            return invokeUnaryOperation(Context, Vector(dim, I, repr), self);
+        }
+
+        /// Computes the fast ceil of each element of the vector, returning an
+        /// integer vector.
+        pub fn fastCeilI(self: Vec, comptime I: type) Vector(dim, I, repr) {
+            const Context = struct {
+                pub fn invokeOnElement(val: T) I {
+                    return @intFromFloat(if (val >= 0) val + 1.0 else val);
+                }
+
+                pub fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, I) {
+                    const val0: @Vector(dim, T) = @splat(0.0);
+                    const val1: @Vector(dim, T) = @splat(1.0);
+                    return @intFromFloat(@select(f32, val >= val0, val + val1, val));
+                }
+            };
+
+            return invokeUnaryOperation(Context, Vector(dim, I, repr), self);
+        }
+
         /// Result of `@abs()` on a `T`.
         const AbsT: type = blk: {
             const info = @typeInfo(T);
@@ -1062,6 +1173,28 @@ pub fn Vector(
             };
 
             return invokeUnaryOperation(Context, Abs, self);
+        }
+
+        /// Casts the vector to a different type.
+        ///
+        /// This function uses the `zm.cast` function to perform the cast. Read the documentation
+        /// of that function for specifics.
+        ///
+        /// # Returns
+        ///
+        /// The converted vector.
+        pub fn cast(self: Vec, comptime Target: type) Vector(dim, Target, repr) {
+            const Context = struct {
+                pub fn invokeOnElement(val: T) Target {
+                    return zm.cast(Target, val);
+                }
+
+                pub fn invokeOnVector(val: @Vector(dim, T)) @Vector(dim, Target) {
+                    return zm.cast(@Vector(dim, Target), val);
+                }
+            };
+
+            return invokeUnaryOperation(Context, Vector(dim, Target, repr), self);
         }
 
         /// Rotates the vector around the Z axis.

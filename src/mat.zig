@@ -282,7 +282,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             assertRowIndex("getRow()", row_index);
 
             switch (layout) {
-                .array_of_rows => {
+                .array_of_columns => {
                     var result: Row = undefined;
                     for (0..columns) |i| result.set(i, self.get(row_index, i));
                     return result;
@@ -769,6 +769,174 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
         }
 
         // =========================================================================================
+        // Other operations
+        // =========================================================================================
+
+        /// Computes the inverse of a square matrix.
+        pub fn inverse(self: Mat) Mat {
+            if (comptime rows == 4 and columns == 4) {
+                const Simd = @Vector(4, T);
+                const ShufMask = @Vector(4, i32);
+
+                const col0 = self.getColumn(0).toSimd();
+                const col1 = self.getColumn(1).toSimd();
+                const col2 = self.getColumn(2).toSimd();
+                const col3 = self.getColumn(3).toSimd();
+
+                const fac0 = blk: {
+                    const swp0a: Simd = @shuffle(T, col3, col2, ShufMask{ 3, 3, ~@as(i32, 3), ~@as(i32, 3) });
+                    const swp0b: Simd = @shuffle(T, col3, col2, ShufMask{ 2, 2, ~@as(i32, 2), ~@as(i32, 2) });
+
+                    const swp00: Simd = @shuffle(T, col2, col1, ShufMask{ 2, 2, ~@as(i32, 2), ~@as(i32, 2) });
+                    const swp01: Simd = @shuffle(T, swp0a, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp02: Simd = @shuffle(T, swp0b, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp03: Simd = @shuffle(T, col2, col1, ShufMask{ 3, 3, ~@as(i32, 3), ~@as(i32, 3) });
+
+                    const mul00: Simd = swp00 * swp01;
+                    const mul01: Simd = swp02 * swp03;
+                    break :blk mul00 - mul01;
+                };
+                const fac1 = blk: {
+                    const swp0a: Simd = @shuffle(T, col3, col2, ShufMask{ 3, 3, ~@as(i32, 3), ~@as(i32, 3) });
+                    const swp0b: Simd = @shuffle(T, col3, col2, ShufMask{ 1, 1, ~@as(i32, 1), ~@as(i32, 1) });
+
+                    const swp00: Simd = @shuffle(T, col2, col1, ShufMask{ 1, 1, ~@as(i32, 1), ~@as(i32, 1) });
+                    const swp01: Simd = @shuffle(T, swp0a, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp02: Simd = @shuffle(T, swp0b, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp03: Simd = @shuffle(T, col2, col1, ShufMask{ 3, 3, ~@as(i32, 3), ~@as(i32, 3) });
+
+                    const mul00: Simd = swp00 * swp01;
+                    const mul01: Simd = swp02 * swp03;
+                    break :blk mul00 - mul01;
+                };
+                const fac2 = blk: {
+                    const swp0a: Simd = @shuffle(T, col3, col2, ShufMask{ 2, 2, ~@as(i32, 2), ~@as(i32, 2) });
+                    const swp0b: Simd = @shuffle(T, col3, col2, ShufMask{ 1, 1, ~@as(i32, 1), ~@as(i32, 1) });
+
+                    const swp00: Simd = @shuffle(T, col2, col1, ShufMask{ 1, 1, ~@as(i32, 1), ~@as(i32, 1) });
+                    const swp01: Simd = @shuffle(T, swp0a, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp02: Simd = @shuffle(T, swp0b, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp03: Simd = @shuffle(T, col2, col1, ShufMask{ 2, 2, ~@as(i32, 2), ~@as(i32, 2) });
+
+                    const mul00: Simd = swp00 * swp01;
+                    const mul01: Simd = swp02 * swp03;
+                    break :blk mul00 - mul01;
+                };
+                const fac3 = blk: {
+                    const swp0a: Simd = @shuffle(T, col3, col2, ShufMask{ 3, 3, ~@as(i32, 3), ~@as(i32, 3) });
+                    const swp0b: Simd = @shuffle(T, col3, col2, ShufMask{ 0, 0, ~@as(i32, 0), ~@as(i32, 0) });
+
+                    const swp00: Simd = @shuffle(T, col2, col1, ShufMask{ 0, 0, ~@as(i32, 0), ~@as(i32, 0) });
+                    const swp01: Simd = @shuffle(T, swp0a, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp02: Simd = @shuffle(T, swp0b, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp03: Simd = @shuffle(T, col2, col1, ShufMask{ 3, 3, ~@as(i32, 3), ~@as(i32, 3) });
+
+                    const mul00: Simd = swp00 * swp01;
+                    const mul01: Simd = swp02 * swp03;
+                    break :blk mul00 - mul01;
+                };
+                const fac4 = blk: {
+                    const swp0a: Simd = @shuffle(T, col3, col2, ShufMask{ 2, 2, ~@as(i32, 2), ~@as(i32, 2) });
+                    const swp0b: Simd = @shuffle(T, col3, col2, ShufMask{ 0, 0, ~@as(i32, 0), ~@as(i32, 0) });
+
+                    const swp00: Simd = @shuffle(T, col2, col1, ShufMask{ 0, 0, ~@as(i32, 0), ~@as(i32, 0) });
+                    const swp01: Simd = @shuffle(T, swp0a, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp02: Simd = @shuffle(T, swp0b, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp03: Simd = @shuffle(T, col2, col1, ShufMask{ 2, 2, ~@as(i32, 2), ~@as(i32, 2) });
+
+                    const mul00: Simd = swp00 * swp01;
+                    const mul01: Simd = swp02 * swp03;
+                    break :blk mul00 - mul01;
+                };
+                const fac5 = blk: {
+                    const swp0a: Simd = @shuffle(T, col3, col2, ShufMask{ 1, 1, ~@as(i32, 1), ~@as(i32, 1) });
+                    const swp0b: Simd = @shuffle(T, col3, col2, ShufMask{ 0, 0, ~@as(i32, 0), ~@as(i32, 0) });
+
+                    const swp00: Simd = @shuffle(T, col2, col1, ShufMask{ 0, 0, ~@as(i32, 0), ~@as(i32, 0) });
+                    const swp01: Simd = @shuffle(T, swp0a, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp02: Simd = @shuffle(T, swp0b, undefined, ShufMask{ 0, 0, 0, 2 });
+                    const swp03: Simd = @shuffle(T, col2, col1, ShufMask{ 1, 1, ~@as(i32, 1), ~@as(i32, 1) });
+
+                    const mul00: Simd = swp00 * swp01;
+                    const mul01: Simd = swp02 * swp03;
+                    break :blk mul00 - mul01;
+                };
+                const sign_a = Simd{ -1.0, 1.0, -1.0, 1.0 };
+                const sign_b = Simd{ 1.0, -1.0, 1.0, -1.0 };
+
+                const temp0: Simd = @shuffle(T, col1, col0, ShufMask{ 0, 0, ~@as(i32, 0), ~@as(i32, 0) });
+                const vec0: Simd = @shuffle(T, temp0, undefined, ShufMask{ 0, 2, 2, 2 });
+
+                const temp1: Simd = @shuffle(T, col1, col0, ShufMask{ 1, 1, ~@as(i32, 1), ~@as(i32, 1) });
+                const vec1: Simd = @shuffle(T, temp1, undefined, ShufMask{ 0, 2, 2, 2 });
+
+                const temp2: Simd = @shuffle(T, col1, col0, ShufMask{ 2, 2, ~@as(i32, 2), ~@as(i32, 2) });
+                const vec2: Simd = @shuffle(T, temp2, undefined, ShufMask{ 0, 2, 2, 2 });
+
+                const temp3: Simd = @shuffle(T, col1, col0, ShufMask{ 3, 3, ~@as(i32, 3), ~@as(i32, 3) });
+                const vec3: Simd = @shuffle(T, temp3, undefined, ShufMask{ 0, 2, 2, 2 });
+
+                const mul00 = vec1 * fac0;
+                const mul01 = vec2 * fac1;
+                const mul02 = vec3 * fac2;
+                const sub00 = mul00 - mul01;
+                const add00 = sub00 + mul02;
+                const inv0 = sign_b * add00;
+
+                const mul03 = vec0 * fac0;
+                const mul04 = vec2 * fac3;
+                const mul05 = vec3 * fac4;
+                const sub01 = mul03 - mul04;
+                const add01 = sub01 + mul05;
+                const inv1 = sign_a * add01;
+
+                const mul06 = vec0 * fac1;
+                const mul07 = vec1 * fac3;
+                const mul08 = vec3 * fac5;
+                const sub02 = mul06 - mul07;
+                const add02 = sub02 + mul08;
+                const inv2 = sign_b * add02;
+
+                const mul09 = vec0 * fac2;
+                const mul10 = vec1 * fac4;
+                const mul11 = vec2 * fac5;
+                const sub03 = mul09 - mul10;
+                const add03 = sub03 + mul11;
+                const inv3 = sign_a * add03;
+
+                const row0 = @shuffle(T, inv0, inv1, ShufMask{ 0, 0, ~@as(i32, 0), ~@as(i32, 0) });
+                const row1 = @shuffle(T, inv2, inv3, ShufMask{ 0, 0, ~@as(i32, 0), ~@as(i32, 0) });
+                const row2 = @shuffle(T, row0, row1, ShufMask{ 0, 2, ~@as(i32, 0), ~@as(i32, 2) });
+
+                const dot0 = zm.simd.dot(4, T, col0, row2);
+                std.debug.assert(dot0 != 0.0);
+
+                const rcp0 = @as(@Vector(4, T), @splat(1.0 / dot0));
+
+                return fromColumns(.{
+                    Column.fromSimd(inv0 * rcp0),
+                    Column.fromSimd(inv1 * rcp0),
+                    Column.fromSimd(inv2 * rcp0),
+                    Column.fromSimd(inv3 * rcp0),
+                });
+            }
+
+            if (rows == 2 and columns == 2) {
+                const sign = @Vector(4, T){ 1.0, -1.0, -1.0, 1.0 };
+                const abcd: @Vector(4, T) = if (layout == .mat2x2_vectorized) self.inner else self.inner[0].inner ++ self.inner[1].inner;
+                const dcba = @shuffle(T, abcd, undefined, @Vector(4, i32){ 3, 2, 1, 0 });
+                const prod = abcd * dcba;
+                const sub = prod - @shuffle(T, prod, undefined, @Vector(4, i32){ 1, 1, 1, 1 });
+                const det = @shuffle(T, sub, undefined, @Vector(4, i32){ 0, 0, 0, 0 });
+                const tmp = sign / det;
+                const dbca = @shuffle(T, abcd, undefined, @Vector(4, i32){ 3, 1, 2, 0 });
+                return Mat{ .inner = dbca * tmp };
+            }
+
+            @compileError("inverse operation not supported for this matrix type");
+        }
+
+        // =========================================================================================
         // Errors
         // =========================================================================================
 
@@ -838,7 +1006,7 @@ pub fn Matrix(comptime r: usize, comptime c: usize, comptime T: type, comptime r
             for (0..rows) |i| {
                 try writer.writeAll("    ");
                 for (0..columns) |j| {
-                    try writer.printValue("d", self.get(i, j), .{ .width = 5, .alignment = .right, .precision = 2 }, writer, 0);
+                    try writer.printValue("d", .{ .width = 5, .alignment = .right, .precision = 2 }, self.get(i, j), 0);
                     try writer.writeByte(' ');
                 }
                 try writer.writeByte('\n');
@@ -1114,6 +1282,29 @@ pub fn includeFixedTestsFor(comptime T: type, comptime repr: ReprConfig) void {
             try std.testing.expectApproxEqRel(t(0.0), m.get(1, 3), 0.1);
             try std.testing.expectApproxEqRel(t(-2.22), m.get(2, 3), 0.1);
             try std.testing.expectApproxEqRel(t(0.0), m.get(3, 3), 0.1);
+        }
+
+        test "inverse4x4_identity" {
+            if (comptime !zm.isFloat(T)) return;
+
+            const m: Mat4 = .identity;
+            const i = m.inverse();
+            try std.testing.expectEqual(m.get(0, 0), i.get(0, 0));
+            try std.testing.expectEqual(m.get(0, 1), i.get(0, 1));
+            try std.testing.expectEqual(m.get(0, 2), i.get(0, 2));
+            try std.testing.expectEqual(m.get(0, 3), i.get(0, 3));
+            try std.testing.expectEqual(m.get(1, 0), i.get(1, 0));
+            try std.testing.expectEqual(m.get(1, 1), i.get(1, 1));
+            try std.testing.expectEqual(m.get(1, 2), i.get(1, 2));
+            try std.testing.expectEqual(m.get(1, 3), i.get(1, 3));
+            try std.testing.expectEqual(m.get(2, 0), i.get(2, 0));
+            try std.testing.expectEqual(m.get(2, 1), i.get(2, 1));
+            try std.testing.expectEqual(m.get(2, 2), i.get(2, 2));
+            try std.testing.expectEqual(m.get(2, 3), i.get(2, 3));
+            try std.testing.expectEqual(m.get(3, 0), i.get(3, 0));
+            try std.testing.expectEqual(m.get(3, 1), i.get(3, 1));
+            try std.testing.expectEqual(m.get(3, 2), i.get(3, 2));
+            try std.testing.expectEqual(m.get(3, 3), i.get(3, 3));
         }
     };
 }

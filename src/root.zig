@@ -204,16 +204,32 @@ pub const Vec4i = Vector(4, i32, .auto);
 pub const Vec4u = Vector(4, u32, .auto);
 pub const Vec4b = Vector(4, bool, .auto);
 
+pub const FastVec2f = Vector(2, f32, .optimize);
+pub const FastVec3f = Vector(3, f32, .optimize);
+pub const FastVec4f = Vector(4, f32, .optimize);
+pub const FastVec2d = Vector(2, f64, .optimize);
+pub const FastVec3d = Vector(3, f64, .optimize);
+pub const FastVec4d = Vector(4, f64, .optimize);
+pub const FastVec2i = Vector(2, i32, .optimize);
+pub const FastVec3i = Vector(3, i32, .optimize);
+pub const FastVec4i = Vector(4, i32, .optimize);
+pub const FastVec2u = Vector(2, u32, .optimize);
+pub const FastVec3u = Vector(3, u32, .optimize);
+pub const FastVec4u = Vector(4, u32, .optimize);
+pub const FastVec2b = Vector(2, bool, .optimize);
+pub const FastVec3b = Vector(3, bool, .optimize);
+pub const FastVec4b = Vector(4, bool, .optimize);
+
 // =================================================================================================
 // Matrices
 // =================================================================================================
 
-pub const Mat2f = Matrix(2, 2, f32, .auto);
-pub const Mat2d = Matrix(2, 2, f64, .auto);
-pub const Mat3f = Matrix(3, 3, f32, .auto);
-pub const Mat3d = Matrix(3, 3, f64, .auto);
-pub const Mat4f = Matrix(4, 4, f32, .auto);
-pub const Mat4d = Matrix(4, 4, f64, .auto);
+pub const Mat2f = Matrix(2, 2, f32, .optimize);
+pub const Mat2d = Matrix(2, 2, f64, .optimize);
+pub const Mat3f = Matrix(3, 3, f32, .optimize);
+pub const Mat3d = Matrix(3, 3, f64, .optimize);
+pub const Mat4f = Matrix(4, 4, f32, .optimize);
+pub const Mat4d = Matrix(4, 4, f64, .optimize);
 
 // =================================================================================================
 // Affine
@@ -223,13 +239,17 @@ pub const Aff2f = Affine(2, f32, .auto);
 pub const Aff2d = Affine(2, f64, .auto);
 pub const Aff3f = Affine(3, f32, .auto);
 pub const Aff3d = Affine(3, f64, .auto);
+pub const FastAff2f = Affine(2, f32, .optimize);
+pub const FastAff2d = Affine(2, f64, .optimize);
+pub const FastAff3f = Affine(3, f32, .optimize);
+pub const FastAff3d = Affine(3, f64, .optimize);
 
 // =================================================================================================
 // Quaternions
 // =================================================================================================
 
-pub const Quatf = Quaternion(f32, .auto);
-pub const Quatd = Quaternion(f64, .auto);
+pub const Quatf = Quaternion(f32, .optimize);
+pub const Quatd = Quaternion(f64, .optimize);
 
 // =================================================================================================
 // Constants
@@ -464,6 +484,24 @@ pub fn cast(comptime T: type, val: anytype) T {
             .int, .comptime_int => return @floatFromInt(val),
             .float, .comptime_float => return @floatCast(val),
             .bool => return @floatFromInt(@intFromBool(val)),
+            else => @compileError(err),
+        },
+        .vector => |vec_info| switch (@typeInfo(S)) {
+            .vector => |vec_info2| switch (@typeInfo(vec_info.child)) {
+                .int, .comptime_int => switch (@typeInfo(vec_info2.child)) {
+                    .int, .comptime_int => return @intCast(val),
+                    .float, .comptime_float => return @intFromFloat(val),
+                    .bool => return @intFromBool(val),
+                    else => @compileError(err),
+                },
+                .float, .comptime_float => switch (@typeInfo(vec_info2.child)) {
+                    .int, .comptime_int => return @floatFromInt(val),
+                    .float, .comptime_float => return @floatCast(val),
+                    .bool => return @floatFromInt(@intFromBool(val)),
+                    else => @compileError(err),
+                },
+                else => @compileError(err),
+            },
             else => @compileError(err),
         },
         else => @compileError(err),
